@@ -26,7 +26,7 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
           <tbody>
             <tr>
               <th className="w-1/4">ふりがな</th>
-              <td colSpan={3}>{student.resume.firstNameKana} {student.resume.lastNameKana}</td>
+              <td colSpan={3}>{student.resume.lastNameKana} {student.resume.firstNameKana}</td>
               <td rowSpan={3} className="w-1/4">
                 {student.resume.photo ? (
                   <div className="flex justify-center">
@@ -45,7 +45,7 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             </tr>
             <tr>
               <th>名前</th>
-              <td colSpan={3} className="text-xl font-semibold">{student.personalInfo.firstName} {student.personalInfo.lastName}</td>
+              <td colSpan={3} className="text-xl font-semibold">{student.personalInfo.lastName} {student.personalInfo.firstName}</td>
             </tr>
             <tr>
               <th>
@@ -53,7 +53,7 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
                   <span>生年月日</span>
                 </div>
               </th>
-              <td colSpan={3} className="w-full text-center">
+              <td className="w-1/2 text-center text-sm">
                 <span>{new Date(student.personalInfo.dateOfBirth).getFullYear()}年</span>
               　<span>{new Date(student.personalInfo.dateOfBirth).getMonth() + 1}月</span>
                 <span>{new Date(student.personalInfo.dateOfBirth).getDate()}日</span>
@@ -61,6 +61,8 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
                   <span>{age}</span>
                   <span>歳）</span>
               </td>
+              <th className="w-1/6">性別</th>
+              <td> {student.personalInfo.gender === 'male' ? '男' : student.personalInfo.gender === 'female' ? '女' : 'その他'}</td>
             </tr>
             <tr>
               <th rowSpan={4}>現住所</th>
@@ -86,22 +88,28 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             <tr>
                 <td>
                    <div className="flex flex-col h-full">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col text-xs">
                       <span>{student.personalInfo.email}</span>
                     </div>
                   </div> 
                 </td>
             </tr>
             <tr>
+              <th>国籍</th>
+              <td>{student.personalInfo.country === 'Nepal' ? 'ネパール' : student.personalInfo.country}</td>
+              <th colSpan={2}>言語知識</th>
+              <td className="text-xs">{student.personalInfo.languages}</td>
+            </tr>
+            <tr>
               <th>婚姻</th>
-              <td colSpan={2}>{student.personalInfo.maritalStatus === 'single' ? '独身' : '既婚'}</td>
-              <th>子供</th>
+              <td >{student.personalInfo.maritalStatus === 'single' ? '独身' : '既婚'}</td>
+              <th colSpan={2}>子供</th>
               <td>{student.personalInfo.numberOfChildren > 0 ? `${student.personalInfo.numberOfChildren}人` : '無し'}</td>
             </tr>
             <tr>
-              <th>就業可能時期</th>
-              <td colSpan={2}>{student.resume.possibleStartDate ? new Date(student.resume.possibleStartDate).toLocaleDateString('ja-JP') : 'いつでも可能'}</td>
-              <th>希望職種</th>
+              <th>来日可能日</th>
+              <td>{student.resume.possibleStartDate ? new Date(student.resume.possibleStartDate).toLocaleDateString('ja-JP') : 'いつでも可能'}</td>
+              <th colSpan={2}>希望職種</th>
               <td>{student.resume.jobCategory === 'nursing' ? '介護' : student.resume.jobCategory}</td>
             </tr>
           </tbody>
@@ -111,24 +119,20 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
         <table className="cv-table mb-4">
           <thead>
             <tr>
+              <th colSpan={3}>学歴</th>
+            </tr>
+            <tr>
               <th className="w-1/12">年</th>
               <th className="w-1/12">月</th>
-              <th>学歴</th>
+              <th>学校名</th>
             </tr>
           </thead>
           <tbody>
             {student.education.map((edu, index) => (
               <tr key={`edu-${index}`}>
-                <td className="text-center">{new Date(edu.startDate).getFullYear()}</td>
-                <td className="text-center">{new Date(edu.startDate).getMonth() + 1}</td>
-                <td>{edu.institution} {edu.degree === 'highSchool' ? '卒業' : '入学'}</td>
-              </tr>
-            ))}
-            {Array.from({ length: 4 - student.education.length }).map((_, index) => (
-              <tr key={`empty-edu-${index}`}>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td className="text-center">{edu.startDate.split('-')[0]}</td>
+                <td className="text-center">{edu.startDate.split('-')[1]}</td>
+                <td>{edu.institution}</td>
               </tr>
             ))}
           </tbody>
@@ -137,62 +141,127 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
         {/* Work History Table */}
         <table className="cv-table mb-4">
           <thead>
+             <tr>
+              <th colSpan={3} >職歴 (アルバイト含む)</th>
+            </tr>
             <tr>
               <th className="w-1/12">年</th>
               <th className="w-1/12">月</th>
-              <th>職歴</th>
+              <th>会社名</th>
             </tr>
           </thead>
           <tbody>
             {student.workExperience.map((work, index) => (
               <tr key={`work-${index}`}>
-                <td className="text-center">{new Date(work.startDate).getFullYear()}</td>
-                <td className="text-center">{new Date(work.startDate).getMonth() + 1}</td>
-                <td>{work.company} {work.position}</td>
+                <td className="text-center">{work.startDate.split('-')[0]}</td>
+                <td className="text-center">{work.startDate.split('-')[1]}</td>
+                <td>{work.company}({work.position})</td>
               </tr>
             ))}
-            {Array.from({ length: 5 - student.workExperience.length }).map((_, index) => (
-              <tr key={`empty-work-${index}`}>
-                <td></td>
-                <td></td>
-                <td></td>
-              </tr>
-            ))}
+           
           </tbody>
         </table>
+
+        {/* Add page break before certificates section */}
+        <div className="page-break-before"></div>
 
         {/* Licenses & Qualifications Table */}
         <table className="cv-table mb-4">
           <thead>
+             <tr>
+              <th colSpan={3}>免許・資格</th>
+            </tr>
             <tr>
               <th className="w-1/12">年</th>
               <th className="w-1/12">月</th>
-              <th>免許・資格</th>
+              <th>資格名</th>
             </tr>
           </thead>
           <tbody>
             {student.certificates.map((cert, index) => (
               <tr key={`cert-${index}`}>
-                <td className="text-center">{new Date(cert.date).getFullYear()}</td>
-                <td className="text-center">{new Date(cert.date).getMonth() + 1}</td>
+                <td className="text-center">{cert.date.split('-')[0]}</td>
+                <td className="text-center">{cert.date.split('-')[1]}</td>
                 <td>{cert.name}</td>
               </tr>
             ))}
-            {Array.from({ length: 5 - student.certificates.length }).map((_, index) => (
-              <tr key={`empty-license-${index}`}>
-                <td></td>
-                <td></td>
-                <td></td>
-              </tr>
-            ))}
+           
+          </tbody>
+        </table>
+
+        {/* Physical Information & Restrictions Table */}
+        <table className="cv-table mb-4">
+          <tbody>
+            <tr>
+              <th className="w-1/6">宗教</th>
+              <td className="w-1/5">{student.personalInfo.religion}</td>
+              <th className="w-1/3">食べられないもの</th>
+              <td>{student.resume.dietaryRestriction}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Physical Information Table */}
+        <table className="cv-table mb-4">
+          <tbody>
+            <tr>
+              <th>身長</th>
+              <td className="w-1/4">{student.resume.height} CM</td>
+              <th>体重</th>
+              <td className="w-1/4">{student.resume.weight} KG</td>
+              <th>靴のサイズ</th>
+              <td>{student.resume.shoeSize} CM</td>
+            </tr>
           </tbody>
         </table>
 
         {/* Self Introduction Section */}
         <div className="mb-4">
-          <h2 className="text-lg font-semibold border-b border-black pb-1 mb-2">自己PR・志望動機</h2>
-          <div className="min-h-[200px] p-2 border border-gray-300 whitespace-pre-wrap">
-            {student.resume.selfIntroduction}
+          <div className="border border-gray-300">
+            <table className="cv-table">
+              <thead>
+                <tr>
+                  <th colSpan={6}>その他・ご自身について</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                  <th className="w-1/6 text-center align-middle">
+                    自己PR<br />志望動機
+                  </th>
+                  <td colSpan={5} className="whitespace-pre-wrap">{student.resume.selfIntroduction}</td>
+                </tr>
+                <tr>
+                  <th>長所</th>
+                  <td colSpan={2}>{student.resume.strength}</td>
+                   <th>短所</th>
+                  <td colSpan={2}>{student.resume.weakness}</td>
+                </tr>
+                <tr>
+                  <th>趣味など</th>
+                  <td colSpan={5} >{student.resume.hobbies}</td>
+                </tr>
+                <tr>
+                  <th rowSpan={student.familyMembers.length + 1}>同居の家族</th>
+                  <th className="w-1/3 text-center border-none">氏名</th>
+                  <th className="w-1/12 text-center border-none">性別</th>
+                  <th className="w-1/12 text-center border-none">年齢</th>
+                  <th className="w-1/12 text-center border-none">関係</th>
+                  <th className="w-1/3 text-center border-none">職業</th>
+                </tr>
+                        {student.familyMembers.map((member, index) => (
+                          <tr key={index}>
+                            <td className="text-center border-none">{member.name}</td>
+                            <td className="text-center border-none">
+                              {member.gender === 'male' ? '男' : member.gender === 'female' ? '女' : 'その他'}
+                            </td>
+                            <td className="text-center border-none">{member.age}</td>
+                            <td className="text-center border-none">{member.relationship}</td>
+                            <td className="text-center border-none">{member.job}</td>
+                          </tr>
+                        ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { School } from 'lucide-react';
 import { FormField } from '../FormField';
+import { FullDateInput } from '../FullDateInput';
 import type { Enrollment } from '../../types/student';
 
 interface EnrollmentStepProps {
@@ -70,19 +71,17 @@ export const EnrollmentStep: React.FC<EnrollmentStepProps> = ({ data, onChange }
 
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Start Date">
-          <input
-            type="date"
+          <FullDateInput
             value={data.startDate}
-            onChange={(e) => handleChange('startDate', e.target.value)}
+            onChange={(value) => handleChange('startDate', value)}
             className="w-full px-3 py-2 border rounded-md"
           />
         </FormField>
 
         <FormField label="Expected End Date">
-          <input
-            type="date"
+          <FullDateInput
             value={data.endDate}
-            onChange={(e) => handleChange('endDate', e.target.value)}
+            onChange={(value) => handleChange('endDate', value)}
             className="w-full px-3 py-2 border rounded-md"
           />
         </FormField>

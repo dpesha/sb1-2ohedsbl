@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
+import { useStudents } from './StudentContext';
 
 type AuthContextType = {
   user: User | null;
@@ -23,6 +25,8 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  const { refreshStudents } = useStudents();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,17 +41,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for changes on auth state (signed in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      
+      if (!session?.user && window.location.pathname !== '/auth') {
+        navigate('/auth');
+      }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error, data } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      if (data.session) {
+        await refreshStudents();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
       throw err;
@@ -68,11 +80,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setError(null);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Clear local state first
+      setUser(null);
+      
+      // Then attempt to sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Always navigate to auth page
+      navigate('/auth');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign out');
-      throw err;
+      // Log error but don't show to user since we're signing out anyway
+      console.warn('Error during sign out:', err);
     }
   };
 

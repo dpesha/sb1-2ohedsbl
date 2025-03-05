@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, GraduationCap } from 'lucide-react';
 import { FormField } from '../FormField';
+import { DateInput } from '../DateInput';
 import type { Education } from '../../types/student';
 
 interface EducationStepProps {
@@ -48,18 +49,16 @@ export const EducationStep: React.FC<EducationStepProps> = ({ data, onChange }) 
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <FormField label="Start Date">
-              <input
-                type="date"
+              <DateInput
                 value={education.startDate}
-                onChange={(e) => handleChange(index, 'startDate', e.target.value)}
+                onChange={(value) => handleChange(index, 'startDate', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>
             <FormField label="End Date">
-              <input
-                type="date"
+              <DateInput
                 value={education.endDate}
-                onChange={(e) => handleChange(index, 'endDate', e.target.value)}
+                onChange={(value) => handleChange(index, 'endDate', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>

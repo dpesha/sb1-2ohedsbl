@@ -1,6 +1,7 @@
 import React from 'react';
 import { Camera } from 'lucide-react';
 import { FormField } from '../FormField';
+import { FullDateInput } from '../FullDateInput';
 import type { Resume } from '../../types/student';
 
 interface ResumeStepProps {
@@ -158,10 +159,9 @@ export const ResumeStep: React.FC<ResumeStepProps> = ({ data, onChange }) => {
 
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Possible Start Date">
-          <input
-            type="date"
+          <FullDateInput
             value={data.possibleStartDate}
-            onChange={(e) => handleChange('possibleStartDate', e.target.value)}
+            onChange={(value) => handleChange('possibleStartDate', value)}
             className="w-full px-3 py-2 border rounded-md"
           />
         </FormField>
@@ -172,10 +172,14 @@ export const ResumeStep: React.FC<ResumeStepProps> = ({ data, onChange }) => {
             className="w-full px-3 py-2 border rounded-md"
           >
             <option value="">Select Category</option>
-            <option value="fullTime">Full Time</option>
-            <option value="partTime">Part Time</option>
-            <option value="internship">Internship</option>
-            <option value="contract">Contract</option>
+            <option value="介護">介護</option>
+            <option value="宿泊">宿泊</option>
+            <option value="外食">外食</option>
+            <option value="建設">建設</option>
+            <option value="農業">農業</option>
+            <option value="ドライバー">ドライバー</option>
+            <option value="ビルクリーニング">ビルクリーニング</option>
+            <option value="グラウンドハンドリング">グラウンドハンドリング</option>
           </select>
         </FormField>
       </div>

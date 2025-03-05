@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, Award } from 'lucide-react';
 import { FormField } from '../FormField';
+import { DateInput } from '../DateInput';
 import type { Certificate } from '../../types/student';
 
 interface CertificatesStepProps {
@@ -53,10 +54,9 @@ export const CertificatesStep: React.FC<CertificatesStepProps> = ({ data, onChan
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Date Received">
-              <input
-                type="date"
+              <DateInput
                 value={certificate.date}
-                onChange={(e) => handleChange(index, 'date', e.target.value)}
+                onChange={(value) => handleChange(index, 'date', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>

@@ -2,9 +2,10 @@ import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput } from 'lucide-react';
 import { Logo } from '../components/Logo';
-import { JapaneseCV } from '../components/JapaneseCV';
 import { useStudents } from '../contexts/StudentContext';
-import type { StudentRegistration } from '../types/student';
+import type { StudentRegistration, EnrollmentData } from '../types/student';
+import { supabase } from '../lib/supabase';
+import { FullDateInput } from '../components/FullDateInput';
 
 
 const statusColors = {
@@ -28,11 +29,64 @@ const statusLabels = {
 export const StudentDetails: React.FC = () => {
   const { id } = useParams();
   const { students, loading, error } = useStudents();
+  const [enrollment, setEnrollment] = React.useState<EnrollmentData | null>(null);
+  const [isEditingEnrollment, setIsEditingEnrollment] = React.useState(false);
+  const [enrollmentForm, setEnrollmentForm] = React.useState<Partial<EnrollmentData>>({});
   const student = students.find(s => s.id === id);
-  const [showCV, setShowCV] = React.useState(false);
 
-  const handlePrint = () => {
-    window.print();
+  React.useEffect(() => {
+    if (id) {
+      fetchEnrollment();
+    }
+  }, [id]);
+
+  const fetchEnrollment = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('student_id', id)
+        .single();
+
+      if (error) throw error;
+      setEnrollment(data);
+      setEnrollmentForm(data || {});
+    } catch (err) {
+      console.error('Error fetching enrollment:', err);
+    }
+  };
+
+  const handleEnrollmentSubmit = async () => {
+    if (!id) return;
+
+    try {
+      const enrollmentData = {
+        ...enrollmentForm,
+        student_id: id
+      };
+
+      if (enrollment) {
+        // Update existing enrollment
+        const { error } = await supabase
+          .from('enrollments')
+          .update(enrollmentData)
+          .eq('id', enrollment.id);
+
+        if (error) throw error;
+      } else {
+        // Create new enrollment
+        const { error } = await supabase
+          .from('enrollments')
+          .insert([enrollmentData]);
+
+        if (error) throw error;
+      }
+
+      await fetchEnrollment();
+      setIsEditingEnrollment(false);
+    } catch (err) {
+      console.error('Error saving enrollment:', err);
+    }
   };
 
   if (loading) {
@@ -83,19 +137,6 @@ export const StudentDetails: React.FC = () => {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCV(!showCV)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-            >
-              <FileOutput className="w-5 h-5" />
-              {showCV ? 'Show Details' : 'Generate CV'}
-            </button>
-            {showCV && (
-              <button onClick={handlePrint} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
-                <FileText className="w-5 h-5" />
-                Print CV
-              </button>
-            )}
             <Link
               to={`/student/${id}/edit`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
@@ -106,10 +147,7 @@ export const StudentDetails: React.FC = () => {
           </div>
         </div>
         
-        {showCV ? (
-          <JapaneseCV student={student} />
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
 
             {/* Header */}
             <div className="p-6 border-b">
@@ -172,26 +210,161 @@ export const StudentDetails: React.FC = () => {
             <div className="p-6 grid grid-cols-2 gap-6">
               {/* Enrollment Information */}
               <div className="col-span-2">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-blue-500" />
                   <h2 className="text-lg font-medium text-gray-900">Enrollment Information</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsEditingEnrollment(!isEditingEnrollment)}
+                    className="text-sm text-blue-500 hover:text-blue-600"
+                  >
+                    {isEditingEnrollment ? 'Cancel' : enrollment ? 'Edit' : 'Add Enrollment'}
+                  </button>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4">
+                {isEditingEnrollment ? (
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          School
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollmentForm.school || ''}
+                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, school: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-md"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Class
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollmentForm.class || ''}
+                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, class: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-md"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Section
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollmentForm.section || ''}
+                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, section: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-md"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Roll Number
+                        </label>
+                        <input
+                          type="text"
+                          value={enrollmentForm.roll_number || ''}
+                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, roll_number: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-md"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Start Date
+                        </label>
+                        <FullDateInput
+                          value={enrollmentForm.start_date || ''}
+                          onChange={(value) => setEnrollmentForm(prev => ({ ...prev, start_date: value }))}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          End Date
+                        </label>
+                        <FullDateInput
+                          value={enrollmentForm.end_date || ''}
+                          onChange={(value) => setEnrollmentForm(prev => ({ ...prev, end_date: value }))}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={enrollmentForm.status || 'learningJapanese'}
+                        onChange={(e) => setEnrollmentForm(prev => ({ ...prev, status: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="learningJapanese">Learning Japanese</option>
+                        <option value="learningSpecificSkill">Learning Specific Skill</option>
+                        <option value="eligibleForInterview">Eligible for Interview</option>
+                        <option value="selectedForJob">Selected for Job</option>
+                        <option value="jobStarted">Job Started</option>
+                        <option value="dropped">Dropped</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleEnrollmentSubmit}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                      >
+                        {enrollment ? 'Update' : 'Create'} Enrollment
+                      </button>
+                    </div>
+                  </div>
+                ) : enrollment ? (
+                  <div className="bg-gray-50 rounded-lg p-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500">School</p>
-                      <p className="font-medium">{student.enrollment.school}</p>
+                      <p className="font-medium">{enrollment.school}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Class</p>
-                      <p className="font-medium">{student.enrollment.class}</p>
+                      <p className="font-medium">{enrollment.class}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Section</p>
+                      <p className="font-medium">{enrollment.section}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Roll Number</p>
+                      <p className="font-medium">{enrollment.roll_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Start Date</p>
+                      <p className="font-medium">{enrollment.start_date}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">End Date</p>
+                      <p className="font-medium">{enrollment.end_date}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm text-gray-500">Status</p>
+                      <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${
+                        statusColors[enrollment.status]
+                      }`}>
+                        {statusLabels[enrollment.status]}
+                      </span>
                     </div>
                   </div>
                 </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No enrollment information available
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

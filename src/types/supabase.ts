@@ -9,6 +9,47 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      enrollments: {
+        Row: {
+          id: string
+          student_id: string
+          school: string
+          class: string
+          section: string | null
+          roll_number: string | null
+          start_date: string
+          end_date: string | null
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          school: string
+          class: string
+          section?: string | null
+          roll_number?: string | null
+          start_date: string
+          end_date?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          school?: string
+          class?: string
+          section?: string | null
+          roll_number?: string | null
+          start_date?: string
+          end_date?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       students: {
         Row: {
           id: string
@@ -21,7 +62,6 @@ export interface Database {
           work_experience: Json
           certificates: Json
           resume: Json
-          enrollment: Json
           user_id: string
         }
         Insert: {
@@ -35,7 +75,6 @@ export interface Database {
           work_experience?: Json
           certificates?: Json
           resume?: Json
-          enrollment?: Json
           user_id: string
         }
         Update: {
@@ -49,7 +88,6 @@ export interface Database {
           work_experience?: Json
           certificates?: Json
           resume?: Json
-          enrollment?: Json
           user_id?: string
         }
       }

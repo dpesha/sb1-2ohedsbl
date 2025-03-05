@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2, Briefcase } from 'lucide-react';
 import { FormField } from '../FormField';
+import { DateInput } from '../DateInput';
 import type { WorkExperience } from '../../types/student';
 
 interface WorkExperienceStepProps {
@@ -47,18 +48,16 @@ export const WorkExperienceStep: React.FC<WorkExperienceStepProps> = ({ data, on
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <FormField label="Start Date">
-              <input
-                type="date"
+              <DateInput
                 value={experience.startDate}
-                onChange={(e) => handleChange(index, 'startDate', e.target.value)}
+                onChange={(value) => handleChange(index, 'startDate', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>
             <FormField label="End Date">
-              <input
-                type="date"
+              <DateInput
                 value={experience.endDate}
-                onChange={(e) => handleChange(index, 'endDate', e.target.value)}
+                onChange={(value) => handleChange(index, 'endDate', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>

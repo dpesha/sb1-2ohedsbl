@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from '../FormField';
+import { FullDateInput } from '../FullDateInput';
 import type { PersonalInfo, IdentityDocument, EmergencyContact } from '../../types/student';
 import { User, FileText, Phone, AlertCircle } from 'lucide-react';
 
@@ -124,11 +125,10 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
               </select>
             </FormField>
             <FormField label="Date of Birth *" error={errors.dateOfBirth}>
-              <input
-                type="date"
+              <FullDateInput
                 name="dateOfBirth"
                 value={personalInfo.dateOfBirth}
-                onChange={(e) => handlePersonalInfoChange('dateOfBirth', e.target.value)}
+                onChange={(value) => handlePersonalInfoChange('dateOfBirth', value)}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>
@@ -168,6 +168,32 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <FormField label="Country *" error={errors.country}>
+              <select
+                name="country"
+                value={personalInfo.country || 'Nepal'}
+                onChange={(e) => handlePersonalInfoChange('country', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="Nepal">Nepal</option>
+                <option value="India">India</option>
+                <option value="Vietnam">Vietnam</option>
+                <option value="Indonesia">Indonesia</option>
+                <option value="Myanmar">Myanmar</option>
+              </select>
+            </FormField>
+            <FormField label="Languages">
+              <input
+                type="text"
+                value={personalInfo.languages}
+                onChange={(e) => handlePersonalInfoChange('languages', e.target.value)}
+                className="w-full px-3 py-2 border rounded-md"
+                placeholder="e.g., Nepali, English, Japanese"
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <FormField label="Religion">
               <input
                 type="text"
@@ -194,11 +220,18 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
             <FormField label="Number of Children">
               <input
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 name="numberOfChildren"
                 value={personalInfo.numberOfChildren}
-                onChange={(e) => onPersonalInfoChange({ ...personalInfo, numberOfChildren: Number(e.target.value) })}
+                onChange={(e) => {
+                  const value = e.target.value === "" ? 0 : Number(e.target.value);
+                  if (!isNaN(value)) {
+                    onPersonalInfoChange({ ...personalInfo, numberOfChildren: value });
+                  }
+                }}
                 min="0"
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </FormField>
           </div>
@@ -238,18 +271,16 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Date of Issue">
-              <input
-                type="date"
+              <FullDateInput
                 value={identityDocument.dateOfIssue}
-                onChange={(e) => onIdentityDocumentChange({ ...identityDocument, dateOfIssue: e.target.value })}
+                onChange={(value) => onIdentityDocumentChange({ ...identityDocument, dateOfIssue: value })}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>
             <FormField label="Expiry Date">
-              <input
-                type="date"
+              <FullDateInput
                 value={identityDocument.expiryDate}
-                onChange={(e) => onIdentityDocumentChange({ ...identityDocument, expiryDate: e.target.value })}
+                onChange={(value) => onIdentityDocumentChange({ ...identityDocument, expiryDate: value })}
                 className="w-full px-3 py-2 border rounded-md"
               />
             </FormField>

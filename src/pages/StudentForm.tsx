@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
+import { FileText } from 'lucide-react';
+import { useStudents } from '../contexts/StudentContext';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Tabs } from '../components/Tabs';
@@ -30,8 +32,7 @@ const TABS = [
   'Education',
   'Work',
   'Certificates',
-  'Resume',
-  'Enrollment'
+  'Resume'
 ];
 
 const initialData: StudentRegistration = {
@@ -44,6 +45,8 @@ const initialData: StudentRegistration = {
     phone: '',
     email: '',
     religion: '',
+    country: 'Nepal',  // Set default country
+    languages: '',     // Initialize languages
     maritalStatus: '',
     numberOfChildren: 0
   },
@@ -78,15 +81,103 @@ const initialData: StudentRegistration = {
     jobCategory: '',
     dietaryRestriction: '',
     photo: ''
+  }
+};
+
+const demoData: StudentRegistration = {
+  personalInfo: {
+    firstName: "John",
+    lastName: "Smith",
+    gender: "male",
+    dateOfBirth: "1995-06-15",
+    address: "123 Main Street, Kathmandu",
+    phone: "+977-9876543210",
+    email: "john.smith@example.com",
+    religion: "Hindu",
+    country: "Nepal",
+    languages: "Nepali, English, Basic Japanese",
+    maritalStatus: "single",
+    numberOfChildren: 0
+  },
+  familyMembers: [
+    {
+      name: "Robert Smith",
+      gender: "male",
+      age: 45,
+      relationship: "Father",
+      job: "Teacher"
+    },
+    {
+      name: "Mary Smith",
+      gender: "female",
+      age: 42,
+      relationship: "Mother",
+      job: "Nurse"
+    }
+  ],
+  identityDocument: {
+    documentType: "passport",
+    number: "N1234567",
+    dateOfIssue: "2020-01-15",
+    placeOfIssue: "Kathmandu",
+    expiryDate: "2030-01-14"
+  },
+  emergencyContact: {
+    name: "Robert Smith",
+    address: "123 Main Street, Kathmandu",
+    phone: "+977-9876543211",
+    email: "robert.smith@example.com"
+  },
+  education: [
+    {
+      startDate: "2013-04",
+      endDate: "2017-03",
+      institution: "Tribhuvan University",
+      degree: "bachelor",
+      fieldOfStudy: "Computer Science"
+    }
+  ],
+  workExperience: [
+    {
+      startDate: "2017-04",
+      endDate: "2023-12",
+      company: "Tech Solutions Nepal",
+      position: "Software Developer"
+    }
+  ],
+  certificates: [
+    {
+      date: "2022-12",
+      name: "JLPT N3"
+    },
+    {
+      date: "2023-06",
+      name: "JLPT N2"
+    }
+  ],
+  resume: {
+    firstNameKana: "ジョン",
+    lastNameKana: "スミス",
+    selfIntroduction: "I am a dedicated professional with experience in software development, seeking to transition into the Japanese IT industry. I have a strong foundation in programming and am passionate about learning new technologies.",
+    strength: "Quick learner, team player, problem-solving skills",
+    weakness: "Sometimes too focused on details",
+    hobbies: "Reading, playing guitar, learning Japanese",
+    height: 175,
+    weight: 70,
+    shoeSize: 27,
+    possibleStartDate: "2024-04-01",
+    jobCategory: "介護",
+    dietaryRestriction: "None",
+    photo: ""
   },
   enrollment: {
-    school: '',
-    class: '',
-    section: '',
-    rollNumber: '',
-    startDate: '',
-    endDate: '',
-    status: 'learningJapanese'
+    school: "Tokyo Language School",
+    class: "Advanced Japanese",
+    section: "Morning",
+    rollNumber: "2024-001",
+    startDate: "2024-04-01",
+    endDate: "2025-03-31",
+    status: "learningJapanese"
   }
 };
 
@@ -94,6 +185,7 @@ export const StudentForm: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refreshStudents } = useStudents();
   const [error, setError] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = React.useState(0);
   const [completedSteps, setCompletedSteps] = React.useState<number[]>([]);
@@ -183,6 +275,7 @@ export const StudentForm: React.FC = () => {
           }]);
       }
 
+      await refreshStudents();
       navigate('/');
     } catch (error) {
       console.error('Error saving student:', error);
@@ -326,6 +419,18 @@ export const StudentForm: React.FC = () => {
           <p className="text-gray-600">Please fill out all the required information</p>
         </div>
 
+        {!id && (
+          <div className="mb-6">
+            <button
+              onClick={() => setFormData(demoData)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              <FileText className="w-5 h-5" />
+              Fill Demo Data
+            </button>
+          </div>
+        )}
+
         <Tabs
           tabs={TABS}
           currentTab={currentTab}
@@ -372,12 +477,6 @@ export const StudentForm: React.FC = () => {
             <ResumeStep
               data={formData.resume}
               onChange={handleResumeChange}
-            />
-          )}
-          {currentTab === 6 && (
-            <EnrollmentStep
-              data={formData.enrollment}
-              onChange={handleEnrollmentChange}
             />
           )}
         </div>

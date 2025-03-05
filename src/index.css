@@ -15,11 +15,15 @@
   @page {
     size: A4;
     margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   
   body {
     margin: 0;
     padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   
   .print\\:hidden {
@@ -32,6 +36,17 @@
   
   .print\\:p-0 {
     padding: 0 !important;
+  }
+
+  .cv-table th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Force page break before certificates section */
+  .page-break-before {
+    page-break-before: always;
   }
 }
 
@@ -54,7 +69,14 @@
 
 .cv-table th {
   background-color: #f3f4f6;
-  font-weight: normal;
+  font-size: 0.875rem;
+  font-weight: bold;
+  vertical-align: middle;
+}
+
+.cv-table thead tr:first-child th {
+  text-align: center;
+  font-size: 1.125rem;
 }
 
 .font-jp {

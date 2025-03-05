@@ -55,10 +55,15 @@ export const FamilyMembersStep: React.FC<FamilyMembersStepProps> = ({ data, onCh
             <FormField label="Age">
               <input
                 type="number"
-                value={member.age}
-                onChange={(e) => handleChange(index, 'age', e.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={member.age || ''}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                  handleChange(index, 'age', value);
+                }}
                 min="0"
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </FormField>
           </div>

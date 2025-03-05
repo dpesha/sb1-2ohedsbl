@@ -91,6 +91,33 @@ export const PersonalInfoStep: React.FC<PersonalInfoStepProps> = ({ data, onChan
         </FormField>
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Country">
+          <select
+            name="country"
+            value={data.country}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="Nepal">Nepal</option>
+            <option value="India">India</option>
+            <option value="Vietnam">Vietnam</option>
+            <option value="Indonesia">Indonesia</option>
+            <option value="Myanmar">Myanmar</option>
+          </select>
+        </FormField>
+        <FormField label="Languages">
+          <input
+            type="text"
+            name="languages"
+            value={data.languages}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded-md"
+            placeholder="e.g., Nepali, English, Japanese"
+          />
+        </FormField>
+      </div>
+
       <FormField label="Religion">
         <input
           type="text"
