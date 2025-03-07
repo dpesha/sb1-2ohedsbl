@@ -1,91 +1,194 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput } from 'lucide-react';
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useStudents } from '../contexts/StudentContext';
-import type { StudentRegistration, EnrollmentData } from '../types/student';
+import type { StudentRegistration, ClassData, Test } from '../types/student';
 import { supabase } from '../lib/supabase';
 import { FullDateInput } from '../components/FullDateInput';
+import { DateInput } from '../components/DateInput';
 
+const SCHOOLS = [
+  'Kings - Kathmandu',
+  'Kings - Pokhara',
+  'Hanasakiya - Chitwan',
+  'External'
+] as const;
 
 const statusColors = {
+  registered: 'bg-gray-100 text-gray-800',
   learningJapanese: 'bg-blue-100 text-blue-800',
   learningSpecificSkill: 'bg-purple-100 text-purple-800',
   eligibleForInterview: 'bg-yellow-100 text-yellow-800',
-  selectedForJob: 'bg-green-100 text-green-800',
+  selectedForJobInterview: 'bg-green-100 text-green-800',
+  passedInterview: 'bg-teal-100 text-teal-800',
   jobStarted: 'bg-emerald-100 text-emerald-800',
   dropped: 'bg-red-100 text-red-800'
 };
 
 const statusLabels = {
+  registered: 'Registered',
   learningJapanese: 'Learning Japanese',
   learningSpecificSkill: 'Learning Specific Skill',
   eligibleForInterview: 'Eligible for Interview',
-  selectedForJob: 'Selected for Job',
+  selectedForJobInterview: 'Selected for Interview',
+  passedInterview: 'Passed Interview',
   jobStarted: 'Job Started',
   dropped: 'Dropped'
 };
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams();
-  const { students, loading, error } = useStudents();
-  const [enrollment, setEnrollment] = React.useState<EnrollmentData | null>(null);
-  const [isEditingEnrollment, setIsEditingEnrollment] = React.useState(false);
-  const [enrollmentForm, setEnrollmentForm] = React.useState<Partial<EnrollmentData>>({});
+  const { students, loading, error, refreshStudents } = useStudents();
+  const [classes, setClasses] = React.useState<ClassData[]>([]);
+  const [isEditingClass, setIsEditingClass] = React.useState(false);
+  const [classForm, setClassForm] = React.useState<Partial<ClassData>>({});
   const student = students.find(s => s.id === id);
+  const [activeTab, setActiveTab] = React.useState<'classes' | 'tests'>('classes');
+  const [tests, setTests] = React.useState<Test[]>([]);
+  const [isAddingTest, setIsAddingTest] = React.useState(false);
+  const [testForm, setTestForm] = React.useState<Partial<Test>>({
+    type: 'jft_basic_a2',
+    passed_date: ''
+  });
 
   React.useEffect(() => {
     if (id) {
-      fetchEnrollment();
+      fetchClasses();
+      fetchTests();
     }
   }, [id]);
 
-  const fetchEnrollment = async () => {
+  const fetchTests = async () => {
     try {
       const { data, error } = await supabase
-        .from('enrollments')
+        .from('tests')
         .select('*')
         .eq('student_id', id)
-        .single();
+        .order('passed_date', { ascending: false });
 
       if (error) throw error;
-      setEnrollment(data);
-      setEnrollmentForm(data || {});
+      setTests(data || []);
+
+      // Update student status if they have passed a skill test
+      if (data?.some(test => test.type === 'skill')) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ status: 'eligibleForInterview' })
+          .eq('id', id);
+
+        if (updateError) throw updateError;
+        await refreshStudents();
+      }
     } catch (err) {
-      console.error('Error fetching enrollment:', err);
+      console.error('Error fetching tests:', err);
     }
   };
 
-  const handleEnrollmentSubmit = async () => {
+  const handleAddTest = async () => {
+    if (!id || !testForm.type || !testForm.passed_date) return;
+
+    try {
+      const { error } = await supabase
+        .from('tests')
+        .insert([{
+          student_id: id,
+          type: testForm.type,
+          skill_category: testForm.type === 'skill' ? testForm.skill_category : null,
+          passed_date: testForm.passed_date
+        }]);
+
+      if (error) throw error;
+
+      await fetchTests();
+      await refreshStudents();
+      setIsAddingTest(false);
+      setTestForm({
+        type: 'jft_basic_a2',
+        passed_date: ''
+      });
+    } catch (err) {
+      console.error('Error adding test:', err);
+    }
+  };
+
+  const handleDeleteTest = async (testId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tests')
+        .delete()
+        .eq('id', testId);
+
+      if (error) throw error;
+      await fetchTests();
+    } catch (err) {
+      console.error('Error deleting test:', err);
+    }
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('student_id', id);
+
+      if (error) throw error;
+      setClasses(data || []);
+      setClassForm({
+        school: '',
+        class: '',
+        section: '',
+        roll_number: '',
+        class_type: 'Language'
+      });
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+    }
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classId);
+
+      if (error) throw error;
+      await fetchClasses();
+      await refreshStudents();
+    } catch (err) {
+      console.error('Error deleting class:', err);
+    }
+  };
+
+  const handleClassSubmit = async () => {
     if (!id) return;
 
     try {
-      const enrollmentData = {
-        ...enrollmentForm,
+      const newClassData = {
+        ...classForm,
         student_id: id
       };
 
-      if (enrollment) {
-        // Update existing enrollment
-        const { error } = await supabase
-          .from('enrollments')
-          .update(enrollmentData)
-          .eq('id', enrollment.id);
+      const { error } = await supabase
+        .from('classes')
+        .insert([newClassData]);
 
-        if (error) throw error;
-      } else {
-        // Create new enrollment
-        const { error } = await supabase
-          .from('enrollments')
-          .insert([enrollmentData]);
+      if (error) throw error;
 
-        if (error) throw error;
-      }
-
-      await fetchEnrollment();
-      setIsEditingEnrollment(false);
+      await fetchClasses();
+      await refreshStudents();
+      setIsEditingClass(false);
+      setClassForm({
+        school: '',
+        class: '',
+        section: '',
+        roll_number: '',
+        class_type: 'Language'
+      });
     } catch (err) {
-      console.error('Error saving enrollment:', err);
+      console.error('Error saving class data:', err);
     }
   };
 
@@ -179,9 +282,9 @@ export const StudentDetails: React.FC = () => {
                         </p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        statusColors[student.enrollment.status]
+                        statusColors[student.status || 'registered']
                       }`}>
-                        {statusLabels[student.enrollment.status]}
+                        {statusLabels[student.status || 'registered']}
                       </span>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-4">
@@ -212,29 +315,75 @@ export const StudentDetails: React.FC = () => {
               <div className="col-span-2">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-blue-500" />
-                  <h2 className="text-lg font-medium text-gray-900">Enrollment Information</h2>
+                    <div className="flex border-b">
+                      <button
+                        onClick={() => setActiveTab('classes')}
+                        className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                          activeTab === 'classes'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="w-5 h-5" />
+                          Classes
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('tests')}
+                        className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                          activeTab === 'tests'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ClipboardCheck className="w-5 h-5" />
+                          Tests
+                        </div>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => setIsEditingEnrollment(!isEditingEnrollment)}
-                    className="text-sm text-blue-500 hover:text-blue-600"
-                  >
-                    {isEditingEnrollment ? 'Cancel' : enrollment ? 'Edit' : 'Add Enrollment'}
-                  </button>
+                  {activeTab === 'classes' && !isEditingClass && (
+                    <button
+                      onClick={() => setIsEditingClass(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Enroll into Class
+                    </button>
+                  )}
+                  {activeTab === 'tests' && !isAddingTest && (
+                    <button
+                      onClick={() => setIsAddingTest(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Test Result
+                    </button>
+                  )}
                 </div>
-                {isEditingEnrollment ? (
+
+                {activeTab === 'classes' && (
+                  isEditingClass ? (
                   <div className="bg-white border rounded-lg p-4">
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           School
                         </label>
-                        <input
-                          type="text"
-                          value={enrollmentForm.school || ''}
-                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, school: e.target.value }))}
+                        <select
+                          value={classForm.school || ''}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, school: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
-                        />
+                        >
+                          <option value="">Select School</option>
+                          {SCHOOLS.map(school => (
+                            <option key={school} value={school}>
+                              {school}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -242,8 +391,9 @@ export const StudentDetails: React.FC = () => {
                         </label>
                         <input
                           type="text"
-                          value={enrollmentForm.class || ''}
-                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, class: e.target.value }))}
+                          value={classForm.class || ''}
+                          disabled={classForm.school === 'External'}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, class: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
                         />
                       </div>
@@ -251,12 +401,28 @@ export const StudentDetails: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Class Type
+                        </label>
+                        <select
+                          disabled={classForm.school === 'External'}
+                          value={classForm.class_type || 'Language'}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, class_type: e.target.value as 'Language' | 'Skill' }))}
+                          className="w-full px-3 py-2 border rounded-md"
+                        >
+                          <option value="">Select Type</option>
+                          <option value="Language">Language</option>
+                          <option value="Skill">Skill</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Section
                         </label>
                         <input
                           type="text"
-                          value={enrollmentForm.section || ''}
-                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, section: e.target.value }))}
+                          disabled={classForm.school === 'External'}
+                          value={classForm.section || ''}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, section: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
                         />
                       </div>
@@ -266,101 +432,181 @@ export const StudentDetails: React.FC = () => {
                         </label>
                         <input
                           type="text"
-                          value={enrollmentForm.roll_number || ''}
-                          onChange={(e) => setEnrollmentForm(prev => ({ ...prev, roll_number: e.target.value }))}
+                          disabled={classForm.school === 'External'}
+                          value={classForm.roll_number || ''}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, roll_number: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Start Date
-                        </label>
-                        <FullDateInput
-                          value={enrollmentForm.start_date || ''}
-                          onChange={(value) => setEnrollmentForm(prev => ({ ...prev, start_date: value }))}
-                          className="w-full"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          End Date
-                        </label>
-                        <FullDateInput
-                          value={enrollmentForm.end_date || ''}
-                          onChange={(value) => setEnrollmentForm(prev => ({ ...prev, end_date: value }))}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
-                      </label>
-                      <select
-                        value={enrollmentForm.status || 'learningJapanese'}
-                        onChange={(e) => setEnrollmentForm(prev => ({ ...prev, status: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="learningJapanese">Learning Japanese</option>
-                        <option value="learningSpecificSkill">Learning Specific Skill</option>
-                        <option value="eligibleForInterview">Eligible for Interview</option>
-                        <option value="selectedForJob">Selected for Job</option>
-                        <option value="jobStarted">Job Started</option>
-                        <option value="dropped">Dropped</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-end">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsEditingClass(false)}
+                          className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                        >
+                          Cancel
+                        </button>
                       <button
-                        onClick={handleEnrollmentSubmit}
+                        onClick={handleClassSubmit}
                         className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                       >
-                        {enrollment ? 'Update' : 'Create'} Enrollment
+                        Enroll into Class
                       </button>
+                      </div>
                     </div>
                   </div>
-                ) : enrollment ? (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">School</p>
-                      <p className="font-medium">{enrollment.school}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Class</p>
-                      <p className="font-medium">{enrollment.class}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Section</p>
-                      <p className="font-medium">{enrollment.section}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Roll Number</p>
-                      <p className="font-medium">{enrollment.roll_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Start Date</p>
-                      <p className="font-medium">{enrollment.start_date}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">End Date</p>
-                      <p className="font-medium">{enrollment.end_date}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-sm text-gray-500">Status</p>
-                      <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${
-                        statusColors[enrollment.status]
-                      }`}>
-                        {statusLabels[enrollment.status]}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                ) : (
+                ) : classes.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    No enrollment information available
+                    No class information available
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    {classes.map((classData) => (
+                      <div key={classData.id} className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-medium text-gray-900">
+                              {classData.school}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                              {classData.class_type} Class
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteClass(classData.id)}
+                            className="text-red-500 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Class</p>
+                            <p className="font-medium">{classData.class}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Section</p>
+                            <p className="font-medium">{classData.section || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Roll Number</p>
+                            <p className="font-medium">{classData.roll_number || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+                )}
+
+                {activeTab === 'tests' && (
+                  <>
+                    {isAddingTest ? (
+                      <div className="bg-white border rounded-lg p-4">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Test Type
+                            </label>
+                            <select
+                              value={testForm.type}
+                              onChange={(e) => setTestForm(prev => ({ 
+                                ...prev, 
+                                type: e.target.value as 'jft_basic_a2' | 'skill',
+                                skill_category: e.target.value === 'skill' ? '' : undefined
+                              }))}
+                              className="w-full px-3 py-2 border rounded-md"
+                            >
+                              <option value="jft_basic_a2">JFT BASIC A2</option>
+                              <option value="skill">Skill Test</option>
+                            </select>
+                          </div>
+                          {testForm.type === 'skill' && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Skill Category
+                              </label>
+                              <select
+                                value={testForm.skill_category}
+                                onChange={(e) => setTestForm(prev => ({ ...prev, skill_category: e.target.value }))}
+                                className="w-full px-3 py-2 border rounded-md"
+                              >
+                                <option value="">Select Category</option>
+                                <option value="介護">介護</option>
+                                <option value="宿泊">宿泊</option>
+                                <option value="外食">外食</option>
+                                <option value="建設">建設</option>
+                                <option value="農業">農業</option>
+                                <option value="ドライバー">ドライバー</option>
+                                <option value="ビルクリーニング">ビルクリーニング</option>
+                                <option value="グラウンドハンドリング">グラウンドハンドリング</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className={testForm.type === 'skill' ? 'col-span-2' : ''}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Passed Date
+                            </label>
+                            <DateInput
+                              value={testForm.passed_date || ''}
+                              onChange={(value) => setTestForm(prev => ({ ...prev, passed_date: value }))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setIsAddingTest(false)}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleAddTest}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                          >
+                            Add Test Result
+                          </button>
+                        </div>
+                      </div>
+                    ) : tests.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No test results available
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {tests.map((test) => (
+                          <div key={test.id} className="bg-gray-50 rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="text-lg font-medium text-gray-900">
+                                  {test.type === 'jft_basic_a2' ? 'JFT BASIC A2' : 'Skill Test'}
+                                </h3>
+                                {test.type === 'skill' && (
+                                  <p className="text-sm text-gray-500">
+                                    {test.skill_category}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleDeleteTest(test.id)}
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Passed Date</p>
+                              <p className="font-medium">
+                                {test.passed_date.split('-')[0]}/{test.passed_date.split('-')[1]}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

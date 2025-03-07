@@ -2,8 +2,7 @@ export interface JobCandidate {
   id: string;
   job_id: string;
   student_id: string;
-  interview_id: string | null;
-  status: 'pending' | 'selected' | 'rejected';
+  status: 'pending' | 'selected' | 'rejected' | 'passed' | 'failed' | 'didnot_participate';
   created_at: string;
   updated_at: string;
 }
@@ -20,10 +19,5 @@ export interface EligibleStudent {
     jobCategory: string;
     firstNameKana: string;
     lastNameKana: string;
-  };
-  enrollment: {
-    school: string;
-    class: string;
-    status: string;
   };
 }

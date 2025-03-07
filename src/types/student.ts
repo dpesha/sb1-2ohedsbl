@@ -72,18 +72,27 @@ export interface Resume {
   photo: string;
 }
 
-export interface Enrollment {
+export interface Class {
   school: string;
   class: string;
   section: string;
   rollNumber: string;
-  startDate: string;
-  endDate: string;
-  status: 'learningJapanese' | 'learningSpecificSkill' | 'eligibleForInterview' | 'selectedForJob' | 'jobStarted' | 'dropped';
+  classType: 'Language' | 'Skill';
+}
+
+export interface Test {
+  id: string;
+  student_id: string;
+  type: 'jft_basic_a2' | 'skill';
+  skill_category?: string;
+  passed_date: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface StudentRegistration {
   id?: string;
+  status?: string;
   personalInfo: PersonalInfo;
   familyMembers: FamilyMember[];
   identityDocument: IdentityDocument;
@@ -94,16 +103,14 @@ export interface StudentRegistration {
   resume: Resume;
 }
 
-export interface EnrollmentData {
+export interface ClassData {
   id: string;
   student_id: string;
   school: string;
   class: string;
   section: string;
   roll_number: string;
-  start_date: string;
-  end_date: string;
-  status: 'learningJapanese' | 'learningSpecificSkill' | 'eligibleForInterview' | 'selectedForJob' | 'jobStarted' | 'dropped';
+  class_type: 'Language' | 'Skill';
   created_at: string;
   updated_at: string;
 }

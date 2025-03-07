@@ -24,30 +24,60 @@ const statusLabels = {
   interview_scheduled: 'Interview Scheduled'
 };
 
-export const JobDetails: React.FC = () => {
+const JobDetails: React.FC = () => {
   const { id } = useParams();
   const [job, setJob] = useState<(Job & { client: Client }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [eligibleStudents, setEligibleStudents] = useState<EligibleStudent[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<EligibleStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const [showInterviewForm, setShowInterviewForm] = useState(false);
-  const [interviewData, setInterviewData] = useState({
-    date: '',
-    time: '',
-    location: '',
-    type: 'online' as const,
-    notes: ''
-  });
+  const [candidates, setCandidates] = useState<(JobCandidate & { student: EligibleStudent })[]>([]);
 
   useEffect(() => {
     fetchJob();
     if (id) {
       fetchEligibleStudents();
-      fetchSelectedStudents();
+      fetchCandidates();
     }
   }, [id]);
+
+  const fetchCandidates = async () => {
+    if (!id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('job_candidates')
+        .select(`
+          *,
+          student:student_id (
+            id,
+            personal_info,
+            resume
+          )
+        `)
+        .eq('job_id', id);
+
+      if (error) throw error;
+      setCandidates(data || []);
+      
+    } catch (err) {
+      console.error('Error fetching candidates:', err);
+    }
+  };
+
+  const handleUpdateCandidateStatus = async (candidateId: string, status: JobCandidate['status']) => {
+    try {
+      const { error } = await supabase
+        .from('job_candidates')
+        .update({ status })
+        .eq('id', candidateId);
+
+      if (error) throw error;
+      await fetchCandidates();
+    } catch (err) {
+      console.error('Error updating candidate status:', err);
+    }
+  };
 
   const fetchEligibleStudents = async () => {
     if (!id) return;
@@ -66,37 +96,6 @@ export const JobDetails: React.FC = () => {
     }
   };
 
-  const fetchSelectedStudents = async () => {
-    if (!id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('job_candidates')
-        .select(`
-          *,
-          student:student_id (
-            id,
-            personal_info,
-            resume
-          )
-        `)
-        .eq('job_id', id);
-
-      if (error) throw error;
-      
-      const selectedStudents = data?.map(candidate => ({
-        id: candidate.student.id,
-        personal_info: candidate.student.personal_info,
-        resume: candidate.student.resume,
-        enrollment: null
-      })) || [];
-
-      setSelectedStudents(selectedStudents);
-    } catch (err) {
-      console.error('Error fetching selected students:', err);
-    }
-  };
-
   const handleSelectStudent = async (student: EligibleStudent) => {
     try {
       const { error } = await supabase
@@ -109,11 +108,9 @@ export const JobDetails: React.FC = () => {
 
       if (error) throw error;
 
-      // Refresh lists
-      await Promise.all([
-        fetchEligibleStudents(),
-        fetchSelectedStudents()
-      ]);
+      // Refresh all necessary data
+      await fetchEligibleStudents();
+      await fetchCandidates();
     } catch (err) {
       console.error('Error selecting student:', err);
     }
@@ -129,11 +126,9 @@ export const JobDetails: React.FC = () => {
 
       if (error) throw error;
 
-      // Refresh lists
-      await Promise.all([
-        fetchEligibleStudents(),
-        fetchSelectedStudents()
-      ]);
+      // Refresh all necessary data
+      await fetchEligibleStudents();
+      await fetchCandidates();
     } catch (err) {
       console.error('Error removing student:', err);
     }
@@ -159,66 +154,6 @@ export const JobDetails: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch job');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleScheduleInterview = async () => {
-    try {
-      if (!id || !interviewData.date || !interviewData.time || !interviewData.location) {
-        throw new Error('Please fill in all required fields');
-      }
-
-      // Create the interview
-      const { data: interview, error: interviewError } = await supabase
-        .from('interviews')
-        .insert([{
-          job_id: id,
-          date: interviewData.date,
-          time: interviewData.time,
-          location: interviewData.location,
-          type: interviewData.type,
-          status: 'scheduled',
-          notes: interviewData.notes,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (interviewError) throw interviewError;
-
-      // Update job candidates with interview_id
-      const { error: updateError } = await supabase
-        .from('job_candidates')
-        .update({ interview_id: interview.id })
-        .eq('job_id', id);
-
-      if (updateError) throw updateError;
-
-      // Update job status
-      const { error: jobError } = await supabase
-        .from('jobs')
-        .update({ 
-          status: 'interview_scheduled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (jobError) throw jobError;
-
-      // Reset form and refresh data
-      setShowInterviewForm(false);
-      setInterviewData({
-        date: '',
-        time: '',
-        location: '',
-        type: 'online',
-        notes: ''
-      });
-      fetchJob();
-    } catch (err) {
-      console.error('Error scheduling interview:', err);
-      setError(err instanceof Error ? err.message : 'Failed to schedule interview');
     }
   };
 
@@ -276,19 +211,36 @@ export const JobDetails: React.FC = () => {
                   <h1 className="text-2xl font-bold text-gray-900">
                     {job.accepting_organization}
                   </h1>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                      {job.category}
+                    </span>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                     statusColors[job.status]
                   }`}>
                     {statusLabels[job.status]}
                   </span>
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-gray-500">
                   <Users className="w-5 h-5" />
-                  <span>{job.position_count} position{job.position_count !== 1 ? 's' : ''}</span>
+                  <div>
+                    <span>{job.position_count} position{job.position_count !== 1 ? 's' : ''}</span>
+                    <span className="mx-1">•</span>
+                    <span>requires {job.candidates_min_count} candidate{job.candidates_min_count !== 1 ? 's' : ''}</span>
+                    <span className="mx-1">•</span>
+                    <span>{candidates.length} candidate{candidates.length !== 1 ? 's' : ''}</span>
+                  </div>
                 </div>
                 <div className="mt-4 flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-600">{job.work_location}</span>
+                  {job.preferred_gender !== 'no preference' && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-gray-600 capitalize">{job.preferred_gender}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -322,6 +274,14 @@ export const JobDetails: React.FC = () => {
                   <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="w-5 h-5 text-gray-400" />
                     <span>Posted: {new Date(job.created_at).toLocaleDateString()}</span>
+                  </div>
+                  {job.interview_date && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Calendar className="w-5 h-5 text-gray-400" />
+                      <span>Interview Date: {new Date(job.interview_date).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-gray-600">
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="w-5 h-5 text-gray-400" />
@@ -365,7 +325,7 @@ export const JobDetails: React.FC = () => {
                             {student.resume.firstNameKana} {student.resume.lastNameKana}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {student.enrollment.school}
+                            {student.resume.jobCategory}
                           </div>
                         </div>
                         <button
@@ -385,140 +345,79 @@ export const JobDetails: React.FC = () => {
                 <h3 className="text-sm font-medium text-gray-700 mb-4">
                   Selected Students
                 </h3>
-                {selectedStudents.length === 0 ? (
+                {candidates.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     No students selected yet
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {selectedStudents.map(student => (
+                    {candidates.map(candidate => (
                       <div
-                        key={student.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        key={candidate.id}
+                        className="p-3 bg-gray-50 rounded-lg"
                       >
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {student.personal_info.firstName} {student.personal_info.lastName}
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {candidate.student.personal_info.firstName} {candidate.student.personal_info.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {candidate.student.resume.firstNameKana} {candidate.student.resume.lastNameKana}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {student.resume.firstNameKana} {student.resume.lastNameKana}
-                          </div>
+                          <button
+                            onClick={() => handleRemoveStudent(candidate.student.id)}
+                            className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600"
+                          >
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleRemoveStudent(student.id)}
-                          className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => handleUpdateCandidateStatus(
+                              candidate.id,
+                              'passed'
+                            )}
+                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
+                              candidate.status === 'passed'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            Passed
+                          </button>
+                          <button
+                            onClick={() => handleUpdateCandidateStatus(
+                              candidate.id,
+                              'failed'
+                            )}
+                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
+                              candidate.status === 'failed'
+                                ? 'bg-red-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            Failed
+                          </button>
+                          <button
+                            onClick={() => handleUpdateCandidateStatus(
+                              candidate.id,
+                              'didnot_participate'
+                            )}
+                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
+                              candidate.status === 'didnot_participate'
+                                ? 'bg-yellow-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            Did Not Participate
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-
-              {/* Interview Scheduling */}
-              {selectedStudents.length > 0 && !showInterviewForm && (
-                <div className="mt-6 text-center">
-                  <button
-                    onClick={() => setShowInterviewForm(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
-                  >
-                    <Calendar className="w-5 h-5" />
-                    Schedule Interview
-                  </button>
-                </div>
-              )}
-
-              {showInterviewForm && (
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule Interview</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={interviewData.date}
-                          onChange={(e) => setInterviewData(prev => ({ ...prev, date: e.target.value }))}
-                          className="w-full px-3 py-2 border rounded-md"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Time *
-                        </label>
-                        <input
-                          type="time"
-                          value={interviewData.time}
-                          onChange={(e) => setInterviewData(prev => ({ ...prev, time: e.target.value }))}
-                          className="w-full px-3 py-2 border rounded-md"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Location *
-                      </label>
-                      <input
-                        type="text"
-                        value={interviewData.location}
-                        onChange={(e) => setInterviewData(prev => ({ ...prev, location: e.target.value }))}
-                        className="w-full px-3 py-2 border rounded-md"
-                        placeholder="Interview location or meeting link"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Type
-                      </label>
-                      <select
-                        value={interviewData.type}
-                        onChange={(e) => setInterviewData(prev => ({ ...prev, type: e.target.value as 'online' | 'offline' | 'hybrid' }))}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="online">Online</option>
-                        <option value="offline">Offline</option>
-                        <option value="hybrid">Hybrid</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Notes
-                      </label>
-                      <textarea
-                        value={interviewData.notes}
-                        onChange={(e) => setInterviewData(prev => ({ ...prev, notes: e.target.value }))}
-                        rows={4}
-                        className="w-full px-3 py-2 border rounded-md"
-                        placeholder="Additional notes about the interview..."
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-4">
-                      <button
-                        onClick={() => setShowInterviewForm(false)}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleScheduleInterview}
-                        className="px-6 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
-                      >
-                        Schedule Interview
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -526,3 +425,5 @@ export const JobDetails: React.FC = () => {
     </div>
   );
 };
+
+export default JobDetails;

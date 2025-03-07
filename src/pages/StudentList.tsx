@@ -2,25 +2,29 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Eye, Edit, Search, FileText } from 'lucide-react';
 import { useStudents } from '../contexts/StudentContext';
-import type { EnrollmentData } from '../types/student';
+import type { ClassData } from '../types/student';
 import { supabase } from '../lib/supabase';
 import type { StudentRegistration } from '../types/student';
 
 
 const statusColors = {
+  registered: 'bg-gray-100 text-gray-800',
   learningJapanese: 'bg-blue-100 text-blue-800',
   learningSpecificSkill: 'bg-purple-100 text-purple-800',
   eligibleForInterview: 'bg-yellow-100 text-yellow-800',
-  selectedForJob: 'bg-green-100 text-green-800',
+  selectedForJobInterview: 'bg-green-100 text-green-800',
+  passedInterview: 'bg-teal-100 text-teal-800',
   jobStarted: 'bg-emerald-100 text-emerald-800',
   dropped: 'bg-red-100 text-red-800'
 };
 
 const statusLabels = {
+  registered: 'Registered',
   learningJapanese: 'Learning Japanese',
   learningSpecificSkill: 'Learning Specific Skill',
   eligibleForInterview: 'Eligible for Interview',
-  selectedForJob: 'Selected for Job',
+  selectedForJobInterview: 'Selected for Interview',
+  passedInterview: 'Passed Interview',
   jobStarted: 'Job Started',
   dropped: 'Dropped'
 };
@@ -28,31 +32,35 @@ const statusLabels = {
 export const StudentList: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isStudent, setIsStudent] = React.useState(false);
-  const [enrollments, setEnrollments] = React.useState<Record<string, EnrollmentData>>({});
+  const [classes, setClasses] = React.useState<Record<string, ClassData[]>>({});
   const [checkingRole, setCheckingRole] = React.useState(true);
   const { students, loading, error } = useStudents();
 
   React.useEffect(() => {
-    const fetchEnrollments = async () => {
+    const fetchClasses = async () => {
       try {
         const { data, error } = await supabase
-          .from('enrollments')
+          .from('classes')
           .select('*');
 
         if (error) throw error;
 
-        const enrollmentMap = (data || []).reduce((acc, enrollment) => {
-          acc[enrollment.student_id] = enrollment;
+        // Group classes by student_id
+        const classMap = (data || []).reduce((acc, classData) => {
+          if (!acc[classData.student_id]) {
+            acc[classData.student_id] = [];
+          }
+          acc[classData.student_id].push(classData);
           return acc;
-        }, {} as Record<string, EnrollmentData>);
+        }, {} as Record<string, ClassData[]>);
 
-        setEnrollments(enrollmentMap);
+        setClasses(classMap);
       } catch (err) {
-        console.error('Error fetching enrollments:', err);
+        console.error('Error fetching classes:', err);
       }
     };
 
-    fetchEnrollments();
+    fetchClasses();
   }, []);
 
   React.useEffect(() => {
@@ -77,7 +85,9 @@ export const StudentList: React.FC = () => {
       student.personalInfo.firstName.toLowerCase().includes(searchLower) ||
       student.personalInfo.lastName.toLowerCase().includes(searchLower) ||
       student.personalInfo.email.toLowerCase().includes(searchLower) ||
-      student.enrollment.school.toLowerCase().includes(searchLower)
+      (classes[student.id]?.some(c => 
+        c.school.toLowerCase().includes(searchLower)
+      ) ?? false)
     );
   });
 
@@ -170,16 +180,31 @@ export const StudentList: React.FC = () => {
                       <div className="text-sm text-gray-500">{student.personalInfo.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{enrollments[student.id]?.school || '-'}</div>
-                      <div className="text-sm text-gray-500">
-                        Class: {enrollments[student.id]?.class || '-'}
-                      </div>
+                      {classes[student.id]?.length > 0 ? (
+                        <div>
+                          <div className="text-sm text-gray-900">
+                            {classes[student.id][classes[student.id].length - 1].school}
+                          </div>
+                          {classes[student.id][classes[student.id].length - 1].school !== 'External' && (
+                            <div className="text-sm text-gray-500">
+                              {classes[student.id][classes[student.id].length - 1].class_type} Class: {classes[student.id][classes[student.id].length - 1].class}
+                              {classes[student.id].length > 1 && (
+                                <span className="ml-1 text-xs text-gray-400">
+                                  (+{classes[student.id].length - 1} more)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">-</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        statusColors[enrollments[student.id]?.status || 'learningJapanese']
+                        statusColors[student.status || 'registered'] || statusColors.registered
                       }`}>
-                        {statusLabels[enrollments[student.id]?.status || 'learningJapanese']}
+                        {statusLabels[student.status || 'registered'] || statusLabels.registered}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

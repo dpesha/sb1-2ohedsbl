@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Briefcase, Calendar, Building2, UserCog, Loader2 } from 'lucide-react';
+import { Users, Briefcase, Building2, UserCog, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -11,8 +11,7 @@ const studentMenuItems = [
 const staffMenuItems = [
   { icon: Users, label: 'Students', path: '/' },
   { icon: Building2, label: 'Clients', path: '/clients' },
-  { icon: Briefcase, label: 'Jobs', path: '/jobs' },
-  { icon: Calendar, label: 'Interviews', path: '/interviews' }
+  { icon: Briefcase, label: 'Jobs', path: '/jobs' }
 ];
 
 const adminMenuItems = [

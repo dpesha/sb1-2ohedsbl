@@ -6,15 +6,12 @@ import { StudentDetails } from './pages/StudentDetails';
 import { StudentCV } from './pages/StudentCV.tsx';
 import { Auth } from './pages/Auth';
 import { Clients } from './pages/Clients';
-import { JobForm } from './pages/JobForm';
-import { JobDetails } from './pages/JobDetails';
 import { ClientForm } from './pages/ClientForm';
 import { ClientDetails } from './pages/ClientDetails';
 import { Users } from './pages/Users';
+import { JobForm } from './pages/JobForm';
+import JobDetails from './pages/JobDetails';
 import { Jobs } from './pages/Jobs';
-import { Interviews } from './pages/Interviews';
-import { InterviewForm } from './pages/InterviewForm';
-import { InterviewDetails } from './pages/InterviewDetails';
 import { PrivateRoute } from './components/PrivateRoute';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -118,34 +115,6 @@ const App: React.FC = () => {
             <Header />
             <Navigation />
             <Users />
-          </PrivateRoute>
-        } />
-        <Route path="/interviews" element={
-          <PrivateRoute>
-            <Header />
-            <Navigation />
-            <Interviews />
-          </PrivateRoute>
-        } />
-        <Route path="/interviews/new" element={
-          <PrivateRoute>
-            <Header />
-            <Navigation />
-            <InterviewForm />
-          </PrivateRoute>
-        } />
-        <Route path="/interviews/:id" element={
-          <PrivateRoute>
-            <Header />
-            <Navigation />
-            <InterviewDetails />
-          </PrivateRoute>
-        } />
-        <Route path="/interviews/:id/edit" element={
-          <PrivateRoute>
-            <Header />
-            <Navigation />
-            <InterviewForm />
           </PrivateRoute>
         } />
       </Routes>

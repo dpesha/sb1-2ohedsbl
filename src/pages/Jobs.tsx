@@ -27,10 +27,34 @@ export const Jobs: React.FC = () => {
   const [jobs, setJobs] = useState<(Job & { client: Client })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [candidateCounts, setCandidateCounts] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchJobs();
+  }, []);
+
+  useEffect(() => {
+    const fetchCandidateCounts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('job_candidates')
+          .select('job_id');
+
+        if (error) throw error;
+
+        const counts = (data || []).reduce((acc, candidate) => {
+          acc[candidate.job_id] = (acc[candidate.job_id] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        setCandidateCounts(counts);
+      } catch (err) {
+        console.error('Error fetching candidate counts:', err);
+      }
+    };
+
+    fetchCandidateCounts();
   }, []);
 
   const fetchJobs = async () => {
@@ -152,9 +176,19 @@ export const Jobs: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Users className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-500">
-                            {job.position_count} position{job.position_count !== 1 ? 's' : ''}
-                          </span>
+                          <div className="text-sm text-gray-500">
+                            {job.interview_date && (
+                              <>
+                                <span>Interview: {new Date(job.interview_date).toLocaleDateString()}</span>
+                                <span className="mx-1">•</span>
+                              </>
+                            )}
+                            <span>{job.position_count} position{job.position_count !== 1 ? 's' : ''}</span>
+                            <span className="mx-1">•</span>
+                           <span>requires {job.candidates_min_count} candidate{job.candidates_min_count !== 1 ? 's' : ''}</span>
+                            <span className="mx-1">•</span>
+                            <span>{candidateCounts[job.id] || 0} candidate{(candidateCounts[job.id] || 0) !== 1 ? 's' : ''}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -175,6 +209,11 @@ export const Jobs: React.FC = () => {
                           <MapPin className="w-4 h-4 text-gray-400" />
                           <span className="text-sm text-gray-900">
                             {job.work_location}
+                            {job.preferred_gender !== 'no preference' && (
+                              <span className="text-gray-500 ml-2 capitalize">
+                                • {job.preferred_gender}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </td>

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { StudentRegistration } from '../types/student'
-import type { Database } from '../types/supabase'
 
 type StudentContextType = {
   students: (StudentRegistration & { id: string })[];
@@ -44,6 +43,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const formattedStudents = data.map(student => {
         return {
           id: student.id,
+          status: student.status,
           personalInfo: student.personal_info,
           familyMembers: student.family_members || [],
           identityDocument: student.identity_document || {},
@@ -72,18 +72,13 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     const subscription = supabase
       .channel('students_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students'
-        },
-        (payload) => {
-          console.log('Database change detected:', payload);
-          fetchStudents();
-        }
-      )
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'students'
+      }, () => {
+        fetchStudents();
+      })
       .subscribe();
 
     return () => {

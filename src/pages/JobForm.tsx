@@ -17,6 +17,9 @@ export const JobForm: React.FC = () => {
     work_location: '',
     category: '',
     position_count: 1,
+    candidates_min_count: 1,
+    interview_date: null,
+    preferred_gender: 'no preference',
     status: 'open'
   });
 
@@ -217,6 +220,35 @@ export const JobForm: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Interview Date
+              </label>
+              <input
+                type="date"
+                name="interview_date"
+                value={formData.interview_date || ''}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Preferred Gender
+              </label>
+              <select
+                name="preferred_gender"
+                value={formData.preferred_gender || 'no preference'}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="no preference">No Preference</option>
+                <option value="male only">Male Only</option>
+                <option value="female only">Female Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Number of Positions
               </label>
               <input
@@ -227,6 +259,23 @@ export const JobForm: React.FC = () => {
                 min="1"
                 className="w-full px-3 py-2 border rounded-md"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Minimum Candidates Required
+              </label>
+              <input
+                type="number"
+                name="candidates_min_count"
+                value={formData.candidates_min_count || 1}
+                onChange={handleChange}
+                min="1"
+                className="w-full px-3 py-2 border rounded-md"
+              />
+              <p className="mt-1 text-sm text-gray-500 text-blue-600">
+                Typically set to double the number of positions (e.g., 8 candidates for 4 positions)
+              </p>
             </div>
 
             <div>
@@ -244,7 +293,6 @@ export const JobForm: React.FC = () => {
                 <option value="cancelled">Cancelled</option>
                 <option value="on_hold">On Hold</option>
                 <option value="candidates_selected">Candidates Selected</option>
-                <option value="interview_scheduled">Interview Scheduled</option>
               </select>
             </div>
 

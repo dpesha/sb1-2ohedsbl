@@ -22,8 +22,7 @@ import type {
   Education,
   WorkExperience,
   Certificate,
-  Resume,
-  Enrollment
+  Resume
 } from '../types/student';
 
 const TABS = [
@@ -169,15 +168,6 @@ const demoData: StudentRegistration = {
     jobCategory: "介護",
     dietaryRestriction: "None",
     photo: ""
-  },
-  enrollment: {
-    school: "Tokyo Language School",
-    class: "Advanced Japanese",
-    section: "Morning",
-    rollNumber: "2024-001",
-    startDate: "2024-04-01",
-    endDate: "2025-03-31",
-    status: "learningJapanese"
   }
 };
 
@@ -215,8 +205,7 @@ export const StudentForm: React.FC = () => {
             education: data.education || [],
             workExperience: data.work_experience || [],
             certificates: data.certificates || [],
-            resume: data.resume || {},
-            enrollment: data.enrollment || {}
+            resume: data.resume || {}
           });
 
           // Set completed steps based on loaded data
@@ -227,7 +216,6 @@ export const StudentForm: React.FC = () => {
           if (data.work_experience?.length > 0) completed.push(3);
           if (data.certificates?.length > 0) completed.push(4);
           if (data.resume?.firstNameKana && data.resume?.lastNameKana) completed.push(5);
-          if (data.enrollment?.school && data.enrollment?.class) completed.push(6);
           setCompletedSteps(completed);
         }
       } catch (err) {
@@ -254,7 +242,6 @@ export const StudentForm: React.FC = () => {
         work_experience: formData.workExperience,
         certificates: formData.certificates,
         resume: formData.resume,
-        enrollment: formData.enrollment,
         user_id: user.id
       };
 
@@ -384,24 +371,6 @@ export const StudentForm: React.FC = () => {
     ) {
       setCompletedSteps(prev => 
         prev.includes(5) ? prev : [...prev, 5]
-      );
-    }
-  };
-
-  const handleEnrollmentChange = (data: Enrollment) => {
-    setFormData(prev => ({
-      ...prev,
-      enrollment: data
-    }));
-    
-    if (
-      data.school &&
-      data.class &&
-      data.startDate &&
-      data.status
-    ) {
-      setCompletedSteps(prev => 
-        prev.includes(6) ? prev : [...prev, 6]
       );
     }
   };
