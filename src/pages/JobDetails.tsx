@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video } from 'lucide-react';
+import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Job } from '../types/job';
 import type { Client } from '../types/client';
@@ -31,6 +31,7 @@ const JobDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [eligibleStudents, setEligibleStudents] = useState<EligibleStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [activeTab, setActiveTab] = useState<'candidates' | 'results'>('candidates');
   const [candidates, setCandidates] = useState<(JobCandidate & { student: EligibleStudent })[]>([]);
 
   useEffect(() => {
@@ -294,9 +295,40 @@ const JobDetails: React.FC = () => {
 
           {/* Candidates Section */}
           <div className="p-6 border-t">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Candidates</h2>
-            
-            <div className="grid grid-cols-2 gap-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex border-b">
+                  <button
+                    onClick={() => setActiveTab('candidates')}
+                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                      activeTab === 'candidates'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      Candidates
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('results')}
+                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                      activeTab === 'results'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-5 h-5" />
+                      Interview Results
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {activeTab === 'candidates' && <div className="grid grid-cols-2 gap-6">
               {/* Eligible Students */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-4">
@@ -372,53 +404,81 @@ const JobDetails: React.FC = () => {
                             Remove
                           </button>
                         </div>
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => handleUpdateCandidateStatus(
-                              candidate.id,
-                              'passed'
-                            )}
-                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
-                              candidate.status === 'passed'
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            Passed
-                          </button>
-                          <button
-                            onClick={() => handleUpdateCandidateStatus(
-                              candidate.id,
-                              'failed'
-                            )}
-                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
-                              candidate.status === 'failed'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            Failed
-                          </button>
-                          <button
-                            onClick={() => handleUpdateCandidateStatus(
-                              candidate.id,
-                              'didnot_participate'
-                            )}
-                            className={`flex-1 px-2 py-1 rounded-md text-sm font-medium ${
-                              candidate.status === 'didnot_participate'
-                                ? 'bg-yellow-500 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            Did Not Participate
-                          </button>
-                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
+
+            {activeTab === 'results' && (
+              <div className="space-y-4">
+                {candidates.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No candidates selected yet
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg border">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Candidate
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Category
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Interview Result
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {candidates.map((candidate) => (
+                          <tr key={candidate.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {candidate.student.personal_info.firstName} {candidate.student.personal_info.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {candidate.student.resume.firstNameKana} {candidate.student.resume.lastNameKana}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {candidate.student.resume.jobCategory}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => handleUpdateCandidateStatus(candidate.id, 'passed')}
+                                  className={`px-3 py-1 rounded-md text-sm font-medium ${
+                                    candidate.status === 'passed' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                >Pass</button>
+                                <button
+                                  onClick={() => handleUpdateCandidateStatus(candidate.id, 'failed')}
+                                  className={`px-3 py-1 rounded-md text-sm font-medium ${
+                                    candidate.status === 'failed' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                >Fail</button>
+                                <button
+                                  onClick={() => handleUpdateCandidateStatus(candidate.id, 'didnot_participate')}
+                                  className={`px-3 py-1 rounded-md text-sm font-medium ${
+                                    candidate.status === 'didnot_participate' ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                >No Show</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
