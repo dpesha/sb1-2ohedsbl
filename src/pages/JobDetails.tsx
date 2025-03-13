@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck } from 'lucide-react';
+import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck, FileText, Upload, X, Download, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Job } from '../types/job';
 import type { Client } from '../types/client';
 import type { JobCandidate, EligibleStudent } from '../types/jobCandidate';
+import type { JobDocument } from '../types/jobDocument';
 
 const statusColors = {
   open: 'bg-green-100 text-green-800',
@@ -33,14 +34,145 @@ const JobDetails: React.FC = () => {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [activeTab, setActiveTab] = useState<'candidates' | 'results'>('candidates');
   const [candidates, setCandidates] = useState<(JobCandidate & { student: EligibleStudent })[]>([]);
+  const [documents, setDocuments] = useState<JobDocument[]>([]);
+  const [resultDates, setResultDates] = useState<Record<string, string>>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [documentType, setDocumentType] = useState<JobDocument['type']>('求人票');
+  const [customType, setCustomType] = useState('');
+  const [downloadingFiles, setDownloadingFiles] = useState<Record<string, boolean>>({});
+
+  const handleDownload = async (doc: JobDocument) => {
+    try {
+      setDownloadingFiles(prev => ({ ...prev, [doc.id]: true }));
+
+      // Download file from Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('job-documents')
+        .download(doc.file_url);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      alert('Failed to download file. Please try again later.');
+    } finally {
+      setDownloadingFiles(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
 
   useEffect(() => {
     fetchJob();
     if (id) {
       fetchEligibleStudents();
       fetchCandidates();
+      fetchDocuments();
     }
   }, [id]);
+
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('job_documents')
+        .select('*')
+        .eq('job_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDocuments(data || []);
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Only PDF and image files (PNG, JPEG) are allowed');
+      return;
+    }
+    
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      // Generate unique file name with job ID prefix
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${id}/${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      // Get public URL first to ensure bucket exists
+      const { data: { publicUrl }, error: urlError } = supabase.storage
+        .from('job-documents')
+        .getPublicUrl(fileName);
+
+      if (urlError) throw urlError;
+
+      // Upload file to Supabase Storage
+      const { data, error: uploadError } = await supabase.storage
+        .from('job-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save document record
+      const { error: dbError } = await supabase
+        .from('job_documents')
+        .insert({
+          job_id: id,
+          type: documentType,
+          custom_type: documentType === 'その他' ? customType : null,
+          file_name: file.name,
+          file_url: fileName
+        });
+
+      if (dbError) throw dbError;
+
+      await fetchDocuments();
+      setDocumentType('求人票');
+      setCustomType('');
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload document');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteDocument = async (document: JobDocument) => {
+    try {
+      // Delete file from Supabase Storage
+      const { error: storageError } = await supabase.storage
+        .from('job-documents')
+        .remove([document.file_url]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error } = await supabase
+        .from('job_documents')
+        .delete()
+        .eq('id', document.id);
+
+      if (error) throw error;
+
+      await fetchDocuments();
+    } catch (err) {
+      console.error('Error deleting document:', err);
+    }
+  };
 
   const fetchCandidates = async () => {
     if (!id) return;
@@ -61,6 +193,18 @@ const JobDetails: React.FC = () => {
       if (error) throw error;
       setCandidates(data || []);
       
+      // Initialize result dates from existing data
+      const dates: Record<string, string> = {};
+      data?.forEach(candidate => {
+        if (candidate.result_date) {
+          dates[candidate.id] = candidate.result_date;
+        } else {
+          // Set today's date as default
+          dates[candidate.id] = new Date().toISOString().split('T')[0];
+        }
+      });
+      setResultDates(dates);
+      
     } catch (err) {
       console.error('Error fetching candidates:', err);
     }
@@ -70,7 +214,10 @@ const JobDetails: React.FC = () => {
     try {
       const { error } = await supabase
         .from('job_candidates')
-        .update({ status })
+        .update({ 
+          status,
+          result_date: resultDates[candidateId]
+        })
         .eq('id', candidateId);
 
       if (error) throw error;
@@ -324,6 +471,19 @@ const JobDetails: React.FC = () => {
                       Interview Results
                     </div>
                   </button>
+                  <button
+                    onClick={() => setActiveTab('documents')}
+                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                      activeTab === 'documents'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Documents
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -428,6 +588,9 @@ const JobDetails: React.FC = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Category
                           </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Result Date
+                          </th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Interview Result
                           </th>
@@ -448,6 +611,17 @@ const JobDetails: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-500">
                               {candidate.student.resume.jobCategory}
+                            </td>
+                            <td className="px-6 py-4">
+                              <input
+                                type="date"
+                                value={resultDates[candidate.id]}
+                                onChange={(e) => setResultDates(prev => ({
+                                  ...prev,
+                                  [candidate.id]: e.target.value
+                                }))}
+                                className="px-3 py-1 border rounded-md text-sm"
+                              />
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex justify-end gap-2">
@@ -475,6 +649,101 @@ const JobDetails: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <div className="space-y-6">
+                {/* Upload Form */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    <select
+                      value={documentType}
+                      onChange={(e) => setDocumentType(e.target.value as JobDocument['type'])}
+                      className="px-3 py-2 border rounded-md"
+                    >
+                      <option value="求人票">求人票</option>
+                      <option value="会社説明">会社説明</option>
+                      <option value="その他">その他</option>
+                    </select>
+                    
+                    {documentType === 'その他' && (
+                      <input
+                        type="text"
+                        value={customType}
+                        onChange={(e) => setCustomType(e.target.value)}
+                        placeholder="Document Type"
+                        className="px-3 py-2 border rounded-md flex-1"
+                      />
+                    )}
+                    
+                    <div className="relative">
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.png,.jpg,.jpeg"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={isUploading}
+                      />
+                      <button
+                        className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 ${
+                          isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        disabled={isUploading}
+                      >
+                        <Upload className="w-4 h-4" />
+                        {isUploading ? 'Uploading...' : 'Upload Document'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {uploadError && (
+                    <p className="text-sm text-red-600">{uploadError}</p>
+                  )}
+                </div>
+
+                {/* Documents List */}
+                {documents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No documents uploaded yet
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-gray-400" />
+                          <h3 className="font-medium text-gray-900">
+                            {doc.type === 'その他' ? doc.custom_type : doc.type}
+                          </h3>
+                          <p className="text-sm text-gray-500">{doc.file_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDownload(doc);
+                            }}
+                            href="#"
+                            className={`p-2 text-gray-400 hover:text-blue-500 ${downloadingFiles[doc.id] ? 'pointer-events-none' : ''}`}
+                          >
+                            {downloadingFiles[doc.id] ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Download className="w-5 h-5" />
+                            )}
+                          </a>
+                          <button
+                            onClick={() => handleDeleteDocument(doc)}
+                            className="p-2 text-gray-400 hover:text-red-500"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

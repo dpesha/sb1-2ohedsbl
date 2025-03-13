@@ -1,9 +1,9 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useStudents } from '../contexts/StudentContext';
-import type { StudentRegistration, ClassData, Test } from '../types/student';
+import type { StudentRegistration, ClassData, Test, StudentDocument } from '../types/student';
 import { supabase } from '../lib/supabase';
 import { FullDateInput } from '../components/FullDateInput';
 import { DateInput } from '../components/DateInput';
@@ -20,8 +20,7 @@ const statusColors = {
   learningJapanese: 'bg-blue-100 text-blue-800',
   learningSpecificSkill: 'bg-purple-100 text-purple-800',
   eligibleForInterview: 'bg-yellow-100 text-yellow-800',
-  selectedForJobInterview: 'bg-green-100 text-green-800',
-  passedInterview: 'bg-teal-100 text-teal-800',
+  selectedForJob: 'bg-green-100 text-green-800',
   jobStarted: 'bg-emerald-100 text-emerald-800',
   dropped: 'bg-red-100 text-red-800'
 };
@@ -31,8 +30,7 @@ const statusLabels = {
   learningJapanese: 'Learning Japanese',
   learningSpecificSkill: 'Learning Specific Skill',
   eligibleForInterview: 'Eligible for Interview',
-  selectedForJobInterview: 'Selected for Interview',
-  passedInterview: 'Passed Interview',
+  selectedForJob: 'Selected for Job',
   jobStarted: 'Job Started',
   dropped: 'Dropped'
 };
@@ -44,20 +42,143 @@ export const StudentDetails: React.FC = () => {
   const [isEditingClass, setIsEditingClass] = React.useState(false);
   const [classForm, setClassForm] = React.useState<Partial<ClassData>>({});
   const student = students.find(s => s.id === id);
-  const [activeTab, setActiveTab] = React.useState<'classes' | 'tests'>('classes');
+  const [activeTab, setActiveTab] = React.useState<'classes' | 'tests' | 'documents'>('classes');
   const [tests, setTests] = React.useState<Test[]>([]);
   const [isAddingTest, setIsAddingTest] = React.useState(false);
   const [testForm, setTestForm] = React.useState<Partial<Test>>({
     type: 'jft_basic_a2',
     passed_date: ''
   });
+  const [documents, setDocuments] = React.useState<StudentDocument[]>([]);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [documentType, setDocumentType] = React.useState<StudentDocument['type']>('Photos');
+  const [customType, setCustomType] = React.useState('');
+  const [downloadingFiles, setDownloadingFiles] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     if (id) {
       fetchClasses();
       fetchTests();
+      fetchDocuments();
     }
   }, [id]);
+
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('student_documents')
+        .select('*')
+        .eq('student_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDocuments(data || []);
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Only PDF and image files (PNG, JPEG) are allowed');
+      return;
+    }
+    
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      // Generate unique file name with student ID prefix
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${id}/${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      // Upload file to Supabase Storage
+      const { data, error: uploadError } = await supabase.storage
+        .from('student-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save document record
+      const { error: dbError } = await supabase
+        .from('student_documents')
+        .insert({
+          student_id: id,
+          type: documentType,
+          custom_type: documentType === 'その他' ? customType : null,
+          file_name: file.name,
+          file_url: fileName
+        });
+
+      if (dbError) throw dbError;
+
+      await fetchDocuments();
+      setDocumentType('Photos');
+      setCustomType('');
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload document');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownload = async (doc: StudentDocument) => {
+    try {
+      setDownloadingFiles(prev => ({ ...prev, [doc.id]: true }));
+
+      // Download file from Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('student-documents')
+        .download(doc.file_url);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading file:', err);
+      alert('Failed to download file. Please try again later.');
+    } finally {
+      setDownloadingFiles(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
+
+  const handleDeleteDocument = async (document: StudentDocument) => {
+    try {
+      // Delete file from Supabase Storage
+      const { error: storageError } = await supabase.storage
+        .from('student-documents')
+        .remove([document.file_url]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error } = await supabase
+        .from('student_documents')
+        .delete()
+        .eq('id', document.id);
+
+      if (error) throw error;
+
+      await fetchDocuments();
+    } catch (err) {
+      console.error('Error deleting document:', err);
+    }
+  };
 
   const fetchTests = async () => {
     try {
@@ -241,6 +362,13 @@ export const StudentDetails: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <Link
+              to={`/student/${id}/cv`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+            >
+              <FileOutput className="w-5 h-5" />
+              View CV
+            </Link>
+            <Link
               to={`/student/${id}/edit`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
             >
@@ -251,7 +379,6 @@ export const StudentDetails: React.FC = () => {
         </div>
         
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-
             {/* Header */}
             <div className="p-6 border-b">
                 <div className="flex items-start gap-6">
@@ -340,6 +467,19 @@ export const StudentDetails: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <ClipboardCheck className="w-5 h-5" />
                           Tests
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('documents')}
+                        className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
+                          activeTab === 'documents'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-5 h-5" />
+                          Documents
                         </div>
                       </button>
                     </div>
@@ -608,9 +748,111 @@ export const StudentDetails: React.FC = () => {
                     )}
                   </>
                 )}
+
+                {activeTab === 'documents' && (
+                  <div className="space-y-6">
+                    {/* Upload Form */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-4 mb-4">
+                        <select
+                          value={documentType}
+                          onChange={(e) => setDocumentType(e.target.value as StudentDocument['type'])}
+                          className="px-3 py-2 border rounded-md"
+                        >
+                          <option value="Photos">Photos</option>
+                          <option value="Passport">Passport</option>
+                          <option value="Driver's License">Driver's License</option>
+                          <option value="その他">その他</option>
+                        </select>
+                        
+                        {documentType === 'その他' && (
+                          <input
+                            type="text"
+                            value={customType}
+                            onChange={(e) => setCustomType(e.target.value)}
+                            placeholder="Document Type"
+                            className="px-3 py-2 border rounded-md flex-1"
+                          />
+                        )}
+                        
+                        <div className="relative">
+                          <input
+                            type="file"
+                            onChange={handleFileUpload}
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={isUploading}
+                          />
+                          <button
+                            className={`inline-flex items-center gap-2 px-4 py-2 ${
+                              isUploading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+                            } text-white rounded-md`}
+                            disabled={isUploading}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4" />
+                                Upload Document
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      {uploadError && (
+                        <p className="text-sm text-red-600">{uploadError}</p>
+                      )}
+                    </div>
+
+                    {/* Document List */}
+                    {documents.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No documents uploaded yet
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {documents.map((doc) => (
+                          <div key={doc.id} className="bg-gray-50 rounded-lg p-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="text-lg font-medium text-gray-900">
+                                  {doc.type === 'その他' ? doc.custom_type : doc.type}
+                                </h3>
+                                <p className="text-sm text-gray-500">{doc.file_name}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDownload(doc)}
+                                  className="text-blue-500 hover:text-blue-600"
+                                  disabled={downloadingFiles[doc.id]}
+                                >
+                                  {downloadingFiles[doc.id] ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Download className="w-4 h-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDocument(doc)}
+                                  className="text-red-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+        </div>
       </div>
     </div>
   );
