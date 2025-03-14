@@ -48,13 +48,14 @@ export const EnrollmentStep: React.FC<EnrollmentStepProps> = ({ data, onChange }
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Section">
+        <FormField label="Batch">
           <input
             type="text"
-            value={data.section}
-            onChange={(e) => handleChange('section', e.target.value)}
+            name="batch"
+            value={data.batch || ''}
+            onChange={(e) => handleChange('batch', e.target.value)}
             className="w-full px-3 py-2 border rounded-md"
-            placeholder="e.g., A, Science, Commerce"
+            placeholder="e.g., Morning, Evening, Weekend"
           />
         </FormField>
 

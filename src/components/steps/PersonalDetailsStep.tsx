@@ -1,8 +1,8 @@
 import React from 'react';
 import { FormField } from '../FormField';
 import { FullDateInput } from '../FullDateInput';
-import type { PersonalInfo, IdentityDocument, EmergencyContact } from '../../types/student';
-import { User, FileText, Phone, AlertCircle } from 'lucide-react';
+import type { PersonalInfo, EmergencyContact } from '../../types/student';
+import { User, Phone, AlertCircle } from 'lucide-react';
 
 interface ValidationErrors {
   firstName?: string;
@@ -16,19 +16,15 @@ interface ValidationErrors {
 
 interface PersonalDetailsStepProps {
   personalInfo: PersonalInfo;
-  identityDocument: IdentityDocument;
   emergencyContact: EmergencyContact;
   onPersonalInfoChange: (data: PersonalInfo) => void;
-  onIdentityDocumentChange: (data: IdentityDocument) => void;
   onEmergencyContactChange: (data: EmergencyContact) => void;
 }
 
 export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
   personalInfo,
-  identityDocument,
   emergencyContact,
   onPersonalInfoChange,
-  onIdentityDocumentChange,
   onEmergencyContactChange
 }) => {
   const [errors, setErrors] = React.useState<ValidationErrors>({});
@@ -235,65 +231,6 @@ export const PersonalDetailsStep: React.FC<PersonalDetailsStepProps> = ({
               />
             </FormField>
           </div>
-        </div>
-      </div>
-
-      {/* Identity Document Section */}
-      <div>
-        <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-          <FileText className="w-5 h-5 text-blue-500" />
-          <h2 className="text-lg font-medium text-gray-900">Identity Document</h2>
-        </div>
-
-        <div className="space-y-4">
-          <FormField label="Document Type">
-            <select
-              value={identityDocument.documentType}
-              onChange={(e) => onIdentityDocumentChange({ ...identityDocument, documentType: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md"
-            >
-              <option value="">Select Document Type</option>
-              <option value="passport">Passport</option>
-              <option value="nationalId">National ID</option>
-              <option value="driverLicense">Driver's License</option>
-              <option value="birthCertificate">Birth Certificate</option>
-            </select>
-          </FormField>
-
-          <FormField label="Document Number">
-            <input
-              type="text"
-              value={identityDocument.number}
-              onChange={(e) => onIdentityDocumentChange({ ...identityDocument, number: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md"
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Date of Issue">
-              <FullDateInput
-                value={identityDocument.dateOfIssue}
-                onChange={(value) => onIdentityDocumentChange({ ...identityDocument, dateOfIssue: value })}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </FormField>
-            <FormField label="Expiry Date">
-              <FullDateInput
-                value={identityDocument.expiryDate}
-                onChange={(value) => onIdentityDocumentChange({ ...identityDocument, expiryDate: value })}
-                className="w-full px-3 py-2 border rounded-md"
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Place of Issue">
-            <input
-              type="text"
-              value={identityDocument.placeOfIssue}
-              onChange={(e) => onIdentityDocumentChange({ ...identityDocument, placeOfIssue: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md"
-            />
-          </FormField>
         </div>
       </div>
 
