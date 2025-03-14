@@ -1,8 +1,13 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2, X } from 'lucide-react';
+import { Document, Page, pdfjs } from 'react-pdf';
 import { Logo } from '../components/Logo';
 import { useStudents } from '../contexts/StudentContext';
+
+// Set worker source for PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+import { FormField } from '../components/FormField';
 import type { StudentRegistration, ClassData, Test, StudentDocument } from '../types/student';
 import { supabase } from '../lib/supabase';
 import { FullDateInput } from '../components/FullDateInput';
@@ -55,6 +60,13 @@ export const StudentDetails: React.FC = () => {
   const [documentType, setDocumentType] = React.useState<StudentDocument['type']>('Photos');
   const [customType, setCustomType] = React.useState('');
   const [downloadingFiles, setDownloadingFiles] = React.useState<Record<string, boolean>>({});
+  const [documentDetailsForm, setDocumentDetailsForm] = React.useState<Partial<DocumentDetails>>({});
+  const [editingDocumentId, setEditingDocumentId] = React.useState<string | null>(null);
+  const [documentDetails, setDocumentDetails] = React.useState<Record<string, DocumentDetails>>({});
+  const [previewData, setPreviewData] = React.useState<{ url: string; type: 'image' | 'pdf' } | null>(null);
+  const [showPreview, setShowPreview] = React.useState(false);
+  const [numPages, setNumPages] = React.useState<number | null>(null);
+  const [pageNumber, setPageNumber] = React.useState(1);
 
   React.useEffect(() => {
     if (id) {
@@ -67,12 +79,24 @@ export const StudentDetails: React.FC = () => {
   const fetchDocuments = async () => {
     try {
       const { data, error } = await supabase
-        .from('student_documents')
-        .select('*')
+        .from('student_documents') 
+        .select(`
+          *,
+          details:student_document_details(*)
+        `)
         .eq('student_id', id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Create a map of document details
+      const detailsMap: Record<string, DocumentDetails> = {};
+      data?.forEach(doc => {
+        if (doc.details && doc.details[0]) {
+          detailsMap[doc.id] = doc.details[0];
+        }
+      });
+      setDocumentDetails(detailsMap);
       setDocuments(data || []);
     } catch (err) {
       console.error('Error fetching documents:', err);
@@ -88,6 +112,13 @@ export const StudentDetails: React.FC = () => {
     if (!allowedTypes.includes(file.type)) {
       setUploadError('Only PDF and image files (PNG, JPEG) are allowed');
       return;
+    }
+
+    // Create preview URL for images
+    if (file.type.startsWith('image/')) {
+      const previewUrl = URL.createObjectURL(file);
+      setPreviewUrl(previewUrl);
+      setShowPreview(true);
     }
     
     try {
@@ -106,7 +137,7 @@ export const StudentDetails: React.FC = () => {
       if (uploadError) throw uploadError;
 
       // Save document record
-      const { error: dbError } = await supabase
+      const { data: docData, error: dbError } = await supabase
         .from('student_documents')
         .insert({
           student_id: id,
@@ -114,7 +145,9 @@ export const StudentDetails: React.FC = () => {
           custom_type: documentType === 'その他' ? customType : null,
           file_name: file.name,
           file_url: fileName
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) throw dbError;
 
@@ -132,6 +165,23 @@ export const StudentDetails: React.FC = () => {
   const handleDownload = async (doc: StudentDocument) => {
     try {
       setDownloadingFiles(prev => ({ ...prev, [doc.id]: true }));
+
+      const { data: { publicUrl }, error: urlError } = supabase.storage
+        .from('student-documents')
+        .getPublicUrl(doc.file_url);
+
+      if (urlError) throw urlError;
+      
+      // For images and PDFs, show preview
+      if (doc.file_name.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+        setPreviewData({
+          url: publicUrl,
+          type: doc.file_name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image'
+        });
+        setShowPreview(true);
+        setDownloadingFiles(prev => ({ ...prev, [doc.id]: false }));
+        return;
+      }
 
       // Download file from Supabase Storage
       const { data, error } = await supabase.storage
@@ -155,6 +205,46 @@ export const StudentDetails: React.FC = () => {
     } finally {
       setDownloadingFiles(prev => ({ ...prev, [doc.id]: false }));
     }
+  };
+
+  const handleSaveDetails = async () => {
+    if (!editingDocumentId) return;
+
+    const existingDetails = documentDetails[editingDocumentId];
+
+    try {
+      if (existingDetails) {
+        // Update existing details
+        const { error } = await supabase
+          .from('student_document_details')
+          .update(documentDetailsForm)
+          .eq('id', existingDetails.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new details
+        const { error } = await supabase
+          .from('student_document_details')
+          .insert({
+            document_id: editingDocumentId,
+            ...documentDetailsForm
+          });
+
+        if (error) throw error;
+      }
+
+      await fetchDocuments();
+      setEditingDocumentId(null);
+      setDocumentDetailsForm({});
+    } catch (err) {
+      console.error('Error saving document details:', err);
+      alert('Error saving document details. Please try again.');
+    }
+  };
+
+  const handleEditDetails = (doc: StudentDocument) => {
+    setEditingDocumentId(doc.id);
+    setDocumentDetailsForm(documentDetails[doc.id] || {});
   };
 
   const handleDeleteDocument = async (document: StudentDocument) => {
@@ -822,7 +912,46 @@ export const StudentDetails: React.FC = () => {
                                 <h3 className="text-lg font-medium text-gray-900">
                                   {doc.type === 'その他' ? doc.custom_type : doc.type}
                                 </h3>
-                                <p className="text-sm text-gray-500">{doc.file_name}</p>
+                                <p className="text-sm text-gray-500 mb-2">{doc.file_name}</p>
+                                {(doc.type === 'Passport' || doc.type === 'Driver\'s License') && (
+                                  <div className="text-xs text-gray-500">
+                                    {documentDetails[doc.id] ? (
+                                      <>
+                                        {documentDetails[doc.id].document_number && (
+                                          <p>Document Number: {documentDetails[doc.id].document_number}</p>
+                                        )}
+                                        {documentDetails[doc.id].date_of_issue && (
+                                          <p>Issue Date: {documentDetails[doc.id].date_of_issue}</p>
+                                        )}
+                                        {documentDetails[doc.id].expiry_date && (
+                                          <p>Expiry Date: {documentDetails[doc.id].expiry_date}</p>
+                                        )}
+                                        {documentDetails[doc.id].place_of_issue && (
+                                          <p>Place of Issue: {documentDetails[doc.id].place_of_issue}</p>
+                                        )}
+                                        {doc.type === 'Driver\'s License' && documentDetails[doc.id].license_type && (
+                                          <p>License Type: {documentDetails[doc.id].license_type}</p>
+                                        )}
+                                        {doc.type === 'Driver\'s License' && documentDetails[doc.id].license_category && (
+                                          <p>License Category: {documentDetails[doc.id].license_category}</p>
+                                        )}
+                                        <button
+                                          onClick={() => handleEditDetails(doc)}
+                                          className="text-blue-500 hover:text-blue-600 mt-1"
+                                        >
+                                          Edit Details
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        onClick={() => setEditingDocumentId(doc.id)}
+                                        className="text-blue-500 hover:text-blue-600"
+                                      >
+                                        Add Details
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <button
@@ -844,10 +973,213 @@ export const StudentDetails: React.FC = () => {
                                 </button>
                               </div>
                             </div>
+                            {editingDocumentId === doc.id && (
+                              <div className="mt-4 border-t pt-4">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">
+                                  {documentDetails[doc.id] ? 'Edit' : 'Add'} Document Details
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <FormField label="Document Number">
+                                    <input
+                                      type="text"
+                                      value={documentDetailsForm.document_number || ''}
+                                      onChange={(e) => setDocumentDetailsForm(prev => ({
+                                        ...prev,
+                                        document_number: e.target.value
+                                      }))}
+                                      className="w-full px-3 py-2 border rounded-md"
+                                      placeholder="Optional"
+                                    />
+                                  </FormField>
+                                  
+                                  <FormField label="Place of Issue">
+                                    <input
+                                      type="text"
+                                      value={documentDetailsForm.place_of_issue || ''}
+                                      onChange={(e) => setDocumentDetailsForm(prev => ({
+                                        ...prev,
+                                        place_of_issue: e.target.value
+                                      }))}
+                                      className="w-full px-3 py-2 border rounded-md"
+                                      placeholder="Optional"
+                                    />
+                                  </FormField>
+                                  
+                                  <FormField label="Date of Issue">
+                                    <FullDateInput
+                                      value={documentDetailsForm.date_of_issue || ''}
+                                      onChange={(value) => setDocumentDetailsForm(prev => ({
+                                        ...prev,
+                                        date_of_issue: value
+                                      }))}
+                                      className="w-full"
+                                      placeholder="Optional"
+                                    />
+                                  </FormField>
+                                  
+                                  <FormField label="Expiry Date">
+                                    <FullDateInput
+                                      value={documentDetailsForm.expiry_date || ''}
+                                      onChange={(value) => setDocumentDetailsForm(prev => ({
+                                        ...prev,
+                                        expiry_date: value
+                                      }))}
+                                      className="w-full"
+                                      placeholder="Optional"
+                                    />
+                                  </FormField>
+
+                                  {doc.type === 'Driver\'s License' && (
+                                    <>
+                                      <FormField label="License Type">
+                                        <input
+                                          type="text"
+                                          value={documentDetailsForm.license_type || ''}
+                                          onChange={(e) => setDocumentDetailsForm(prev => ({
+                                            ...prev,
+                                            license_type: e.target.value
+                                          }))}
+                                          className="w-full px-3 py-2 border rounded-md"
+                                          placeholder="Optional"
+                                        />
+                                      </FormField>
+                                      
+                                      <FormField label="License Category">
+                                        <input
+                                          type="text"
+                                          value={documentDetailsForm.license_category || ''}
+                                          onChange={(e) => setDocumentDetailsForm(prev => ({
+                                            ...prev,
+                                            license_category: e.target.value
+                                          }))}
+                                          className="w-full px-3 py-2 border rounded-md"
+                                          placeholder="Optional"
+                                        />
+                                      </FormField>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                  <button
+                                    onClick={() => {
+                                      setEditingDocumentId(null);
+                                      setDocumentDetailsForm({});
+                                    }}
+                                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={handleSaveDetails}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                                  >
+                                    Save Details
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+                
+                {/* Image Preview Modal */}
+                {showPreview && previewData && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-4 rounded-lg max-w-3xl max-h-[90vh] overflow-auto">
+                      <div className="flex justify-between items-center mb-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Extract just the file path from the URL
+                              const filePath = previewData.url.split('/student-documents/')[1];
+                              if (!filePath) throw new Error('Invalid file path');
+
+                              const { data, error } = await supabase.storage
+                                .from('student-documents')
+                                .download(filePath);
+                              
+                              if (error) throw error;
+                              
+                              // Create download link
+                              const url = URL.createObjectURL(data);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              // Use the original file name from the document record
+                              const doc = documents.find(d => d.file_url === filePath);
+                              link.download = doc?.file_name || 'document';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(url);
+                            } catch (err) {
+                              console.error('Error downloading file:', err);
+                              alert('Failed to download file. Please try again later.');
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowPreview(false);
+                            setPreviewData(null);
+                            setPageNumber(1);
+                            setNumPages(null);
+                          }}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
+                      {previewData.type === 'image' ? (
+                        <img
+                          src={previewData.url}
+                          alt="Document Preview"
+                          className="max-w-full h-auto"
+                        />
+                      ) : (
+                        <div>
+                          <Document
+                            file={previewData.url}
+                            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                            className="max-w-full"
+                          >
+                            <Page
+                              pageNumber={pageNumber}
+                              width={800}
+                              renderAnnotationLayer={false}
+                              renderTextLayer={false}
+                            />
+                          </Document>
+                          {numPages && numPages > 1 && (
+                            <div className="flex items-center justify-center gap-4 mt-4">
+                              <button
+                                onClick={() => setPageNumber(prev => Math.max(1, prev - 1))}
+                                disabled={pageNumber <= 1}
+                                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
+                              >
+                                Previous
+                              </button>
+                              <span>
+                                Page {pageNumber} of {numPages}
+                              </span>
+                              <button
+                                onClick={() => setPageNumber(prev => Math.min(numPages, prev + 1))}
+                                disabled={pageNumber >= numPages}
+                                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
