@@ -64,7 +64,7 @@ export interface Resume {
   photo: string;
 }
 
-export interface Class {
+interface Class {
   school: string;
   class: string;
   batch: string;

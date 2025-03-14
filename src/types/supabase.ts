@@ -1,4 +1,4 @@
-export type Json =
+type Json =
   | string
   | number
   | boolean
@@ -56,7 +56,6 @@ export interface Database {
           created_at: string
           personal_info: Json
           family_members: Json
-          identity_document: Json
           emergency_contact: Json
           education: Json
           work_experience: Json
@@ -69,7 +68,6 @@ export interface Database {
           created_at?: string
           personal_info: Json
           family_members?: Json
-          identity_document?: Json
           emergency_contact?: Json
           education?: Json
           work_experience?: Json
@@ -82,7 +80,6 @@ export interface Database {
           created_at?: string
           personal_info?: Json
           family_members?: Json
-          identity_document?: Json
           emergency_contact?: Json
           education?: Json
           work_experience?: Json

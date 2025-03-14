@@ -193,7 +193,6 @@ export const StudentForm: React.FC = () => {
             id: data.id,
             personalInfo: data.personal_info,
             familyMembers: data.family_members || [],
-            identityDocument: data.identity_document || {},
             emergencyContact: data.emergency_contact || {},
             education: data.education || [],
             workExperience: data.work_experience || [],
@@ -229,7 +228,6 @@ export const StudentForm: React.FC = () => {
       const studentData = {
         personal_info: formData.personalInfo,
         family_members: formData.familyMembers,
-        identity_document: formData.identityDocument,
         emergency_contact: formData.emergencyContact,
         education: formData.education,
         work_experience: formData.workExperience,
