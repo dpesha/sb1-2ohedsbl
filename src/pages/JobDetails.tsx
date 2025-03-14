@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck, FileText, Upload, X, Download, Loader2 } from 'lucide-react';
+import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck, FileText, Upload, X, Download, Loader2, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Job } from '../types/job';
 import type { Client } from '../types/client';
 import type { JobCandidate, EligibleStudent } from '../types/jobCandidate';
 import type { JobDocument } from '../types/jobDocument';
+import { DocumentPreview } from '../components/DocumentPreview';
 
 const statusColors = {
   open: 'bg-green-100 text-green-800',
@@ -40,35 +41,7 @@ const JobDetails: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [documentType, setDocumentType] = useState<JobDocument['type']>('求人票');
   const [customType, setCustomType] = useState('');
-  const [downloadingFiles, setDownloadingFiles] = useState<Record<string, boolean>>({});
-
-  const handleDownload = async (doc: JobDocument) => {
-    try {
-      setDownloadingFiles(prev => ({ ...prev, [doc.id]: true }));
-
-      // Download file from Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('job-documents')
-        .download(doc.file_url);
-
-      if (error) throw error;
-
-      // Create download link
-      const url = URL.createObjectURL(data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = doc.file_name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error downloading file:', err);
-      alert('Failed to download file. Please try again later.');
-    } finally {
-      setDownloadingFiles(prev => ({ ...prev, [doc.id]: false }));
-    }
-  };
+  const [selectedDocument, setSelectedDocument] = useState<JobDocument | null>(null);
 
   useEffect(() => {
     fetchJob();
@@ -721,23 +694,17 @@ const JobDetails: React.FC = () => {
                           <p className="text-sm text-gray-500">{doc.file_name}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <a
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDownload(doc);
-                            }}
-                            href="#"
-                            className={`p-2 text-gray-400 hover:text-blue-500 ${downloadingFiles[doc.id] ? 'pointer-events-none' : ''}`}
+                          <button
+                            onClick={() => setSelectedDocument(doc)}
+                            className="p-2 text-gray-400 hover:text-blue-500"
+                            title="Preview Document"
                           >
-                            {downloadingFiles[doc.id] ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <Download className="w-5 h-5" />
-                            )}
-                          </a>
+                            <Eye className="w-5 h-5" />
+                          </button>
                           <button
                             onClick={() => handleDeleteDocument(doc)}
                             className="p-2 text-gray-400 hover:text-red-500"
+                            title="Delete Document"
                           >
                             <X className="w-5 h-5" />
                           </button>
@@ -747,6 +714,14 @@ const JobDetails: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
+            {selectedDocument && (
+              <DocumentPreview
+                isOpen={true}
+                onClose={() => setSelectedDocument(null)}
+                documentFile={selectedDocument}
+                bucketName="job-documents"
+              />
             )}
           </div>
         </div>
