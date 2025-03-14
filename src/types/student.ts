@@ -21,14 +21,6 @@ export interface FamilyMember {
   job: string;
 }
 
-export interface IdentityDocument {
-  documentType: string;
-  number: string;
-  dateOfIssue: string;
-  placeOfIssue: string;
-  expiryDate: string;
-}
-
 export interface EmergencyContact {
   name: string;
   address: string;
@@ -75,7 +67,7 @@ export interface Resume {
 export interface Class {
   school: string;
   class: string;
-  section: string;
+  batch: string;
   rollNumber: string;
   classType: 'Language' | 'Skill';
 }
@@ -95,7 +87,6 @@ export interface StudentRegistration {
   status?: string;
   personalInfo: PersonalInfo;
   familyMembers: FamilyMember[];
-  identityDocument: IdentityDocument;
   emergencyContact: EmergencyContact;
   education: Education[];
   workExperience: WorkExperience[];
@@ -108,7 +99,7 @@ export interface ClassData {
   student_id: string;
   school: string;
   class: string;
-  section: string;
+  batch: string;
   roll_number: string;
   class_type: 'Language' | 'Skill';
   created_at: string;

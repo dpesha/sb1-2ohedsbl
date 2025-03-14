@@ -556,7 +556,7 @@ export const StudentDetails: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Section
+                          Batch
                         </label>
                         <input
                           type="text"
@@ -626,8 +626,8 @@ export const StudentDetails: React.FC = () => {
                             <p className="font-medium">{classData.class}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Section</p>
-                            <p className="font-medium">{classData.section || '-'}</p>
+                            <p className="text-sm text-gray-500">Batch</p>
+                            <p className="font-medium">{classData.batch || '-'}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Roll Number</p>

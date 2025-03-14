@@ -50,13 +50,6 @@ const initialData: StudentRegistration = {
     numberOfChildren: 0
   },
   familyMembers: [],
-  identityDocument: {
-    documentType: '',
-    number: '',
-    dateOfIssue: '',
-    placeOfIssue: '',
-    expiryDate: ''
-  },
   emergencyContact: {
     name: '',
     address: '',
@@ -298,13 +291,6 @@ export const StudentForm: React.FC = () => {
     }
   };
 
-  const handleIdentityDocumentChange = (data: IdentityDocument) => {
-    setFormData(prev => ({
-      ...prev,
-      identityDocument: data
-    }));
-  };
-
   const handleEmergencyContactChange = (data: EmergencyContact) => {
     setFormData(prev => ({
       ...prev,
@@ -411,10 +397,8 @@ export const StudentForm: React.FC = () => {
           {currentTab === 0 && (
             <PersonalDetailsStep
               personalInfo={formData.personalInfo}
-              identityDocument={formData.identityDocument}
               emergencyContact={formData.emergencyContact}
               onPersonalInfoChange={handlePersonalInfoChange}
-              onIdentityDocumentChange={handleIdentityDocumentChange}
               onEmergencyContactChange={handleEmergencyContactChange}
             />
           )}
