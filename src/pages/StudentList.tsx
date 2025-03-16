@@ -1,11 +1,10 @@
 import React from 'react';
-import { Link,useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Eye, Edit, Search, FileText } from 'lucide-react';
 import { useStudents } from '../contexts/StudentContext';
 import type { ClassData, Test } from '../types/student';
 import { supabase } from '../lib/supabase';
 import type { StudentRegistration } from '../types/student';
-
 
 const statusColors = {
   registered: 'bg-gray-100 text-gray-800',
@@ -36,6 +35,21 @@ export const StudentList: React.FC = () => {
   const [tests, setTests] = React.useState<Record<string, Test[]>>({});
   const [checkingRole, setCheckingRole] = React.useState(true);
   const { students, loading, error } = useStudents();
+
+  // Add state variables for filters
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [genderFilter, setGenderFilter] = React.useState('');
+  const [schoolFilter, setSchoolFilter] = React.useState('');
+  const [skillFilter, setSkillFilter] = React.useState('');
+  const [ageFilter, setAgeFilter] = React.useState('');
+
+  const getAge = (date) => {
+    const today = new Date();
+    return Math.floor(
+      (today.getTime() - new Date(date).getTime()) / 
+      (365.25 * 24 * 60 * 60 * 1000)
+    );
+  };
 
   React.useEffect(() => {
     const fetchClasses = async () => {
@@ -106,13 +120,29 @@ export const StudentList: React.FC = () => {
 
   const filteredStudents = students.filter(student => {
     const searchLower = searchTerm.toLowerCase();
+    const age = getAge(student.personalInfo.dateOfBirth);
+
     return (
-      student.personalInfo.firstName.toLowerCase().includes(searchLower) ||
-      student.personalInfo.lastName.toLowerCase().includes(searchLower) ||
-      student.personalInfo.email.toLowerCase().includes(searchLower) ||
-      (classes[student.id]?.some(c => 
-        c.school.toLowerCase().includes(searchLower)
-      ) ?? false)
+      (statusFilter === '' || student.status === statusFilter) &&
+      (genderFilter === '' || student.personalInfo.gender.toLowerCase() === genderFilter.toLowerCase()) &&
+      (schoolFilter === '' || classes[student.id]?.some(c => c.school.toLowerCase().includes(schoolFilter.toLowerCase()))) &&
+      (skillFilter === '' || tests[student.id]?.some(t => t.skill_category?.toLowerCase().includes(skillFilter.toLowerCase()))) &&
+      (ageFilter === '' || age === parseInt(ageFilter)) &&
+      (
+        student.personalInfo.firstName.toLowerCase().includes(searchLower) ||
+        student.personalInfo.lastName.toLowerCase().includes(searchLower) ||
+        student.personalInfo.gender.toLowerCase().includes(searchLower) ||
+        statusLabels[student.status]?.toLowerCase().includes(searchLower) ||
+        (classes[student.id]?.some(c => 
+          c.school.toLowerCase().includes(searchLower) ||
+          c.class.toLowerCase().includes(searchLower) ||
+          c.batch.toLowerCase().includes(searchLower)
+        ) ?? false) ||
+        (tests[student.id]?.some(t =>
+          t.type === 'jft_basic_a2' ? 'JFT Basic A2'.toLowerCase().includes(searchLower) :
+          t.skill_category?.toLowerCase().includes(searchLower)
+        ) ?? false)
+      )
     );
   });
 
@@ -123,44 +153,69 @@ export const StudentList: React.FC = () => {
     navigate(url);
   };
 
-  
-  const getAge = (date) => {
-    const today = new Date();
-    return Math.floor(
-      (today.getTime() - new Date(date).getTime()) / 
-      (365.25 * 24 * 60 * 60 * 1000)
-    );
-};
-
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {!isStudent && (
           <div className="flex justify-end mb-8">
-          <Link
-            to="/student/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-5 h-5" />
-            Add New Student
-          </Link>
+            <Link
+              to="/student/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-blue text-white rounded-md hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-5 h-5" />
+              Add New Student
+            </Link>
           </div>
         )}
 
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {!isStudent && (
             <div className="p-4 border-b">
-            <div className="relative">
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search students..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-md"
-              />
-            </div>
+              <div className="relative">
+                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search students..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border rounded-md"
+                />
+              </div>
+              <div className="mt-4 flex gap-4">
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded-md p-2">
+                  <option value="">All Statuses</option>
+                  {Object.entries(statusLabels).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+                <select value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)} className="border rounded-md p-2">
+                  <option value="">All Genders</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Filter by school"
+                  value={schoolFilter}
+                  onChange={(e) => setSchoolFilter(e.target.value)}
+                  className="border rounded-md p-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by skill"
+                  value={skillFilter}
+                  onChange={(e) => setSkillFilter(e.target.value)}
+                  className="border rounded-md p-2"
+                />
+                <input
+                  type="number"
+                  placeholder="Filter by age"
+                  value={ageFilter}
+                  onChange={(e) => setAgeFilter(e.target.value)}
+                  className="border rounded-md p-2"
+                />
+              </div>
             </div>
           )}
 
