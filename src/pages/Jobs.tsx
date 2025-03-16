@@ -3,7 +3,7 @@ import { Briefcase, Plus, Search, Eye, Edit, Building2, MapPin, Users } from 'lu
 import { supabase } from '../lib/supabase';
 import type { Job } from '../types/job';
 import type { Client } from '../types/client';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const statusColors = {
   open: 'bg-green-100 text-green-800',
@@ -92,6 +92,13 @@ export const Jobs: React.FC = () => {
     );
   });
 
+  const navigate = useNavigate();
+  
+  // Function to handle row click
+  const handleRowClick = (url) => {
+    navigate(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -169,7 +176,7 @@ export const Jobs: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredJobs.map((job) => (
-                    <tr key={job.id} className="hover:bg-gray-50">
+                    <tr key={job.id} className="hover:bg-gray-50" onClick={() => handleRowClick(`/jobs/${job.id}`)}>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
                           {job.accepting_organization}

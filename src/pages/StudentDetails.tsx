@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2, X, Eye } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Logo } from '../components/Logo';
 import { useStudents } from '../contexts/StudentContext';
@@ -349,7 +349,7 @@ export const StudentDetails: React.FC = () => {
       setClassForm({
         school: '',
         class: '',
-        section: '',
+        batch: '',
         roll_number: '',
         class_type: 'Language'
       });
@@ -394,7 +394,7 @@ export const StudentDetails: React.FC = () => {
       setClassForm({
         school: '',
         class: '',
-        section: '',
+        batch: '',
         roll_number: '',
         class_type: 'Language'
       });
@@ -651,7 +651,7 @@ export const StudentDetails: React.FC = () => {
                         <input
                           type="text"
                           disabled={classForm.school === 'External'}
-                          value={classForm.section || ''}
+                          value={classForm.batch || ''}
                           onChange={(e) => setClassForm(prev => ({ ...prev, section: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
                         />
@@ -962,7 +962,7 @@ export const StudentDetails: React.FC = () => {
                                   {downloadingFiles[doc.id] ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <Download className="w-4 h-4" />
+                                    <Eye className="w-4 h-4" />
                                   )}
                                 </button>
                                 <button

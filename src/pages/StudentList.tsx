@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useNavigate } from 'react-router-dom';
 import { Plus, Eye, Edit, Search, FileText } from 'lucide-react';
 import { useStudents } from '../contexts/StudentContext';
-import type { ClassData } from '../types/student';
+import type { ClassData, Test } from '../types/student';
 import { supabase } from '../lib/supabase';
 import type { StudentRegistration } from '../types/student';
 
@@ -33,6 +33,7 @@ export const StudentList: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isStudent, setIsStudent] = React.useState(false);
   const [classes, setClasses] = React.useState<Record<string, ClassData[]>>({});
+  const [tests, setTests] = React.useState<Record<string, Test[]>>({});
   const [checkingRole, setCheckingRole] = React.useState(true);
   const { students, loading, error } = useStudents();
 
@@ -60,7 +61,31 @@ export const StudentList: React.FC = () => {
       }
     };
 
+    const fetchTests = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tests')
+          .select('*');
+
+        if (error) throw error;
+
+        // Group tests by student_id
+        const testMap = (data || []).reduce((acc, testData) => {
+          if (!acc[testData.student_id]) {
+            acc[testData.student_id] = [];
+          }
+          acc[testData.student_id].push(testData);
+          return acc;
+        }, {} as Record<string, Test[]>);
+
+        setTests(testMap);
+      } catch (err) {
+        console.error('Error fetching tests:', err);
+      }
+    };
+
     fetchClasses();
+    fetchTests();
   }, []);
 
   React.useEffect(() => {
@@ -90,6 +115,23 @@ export const StudentList: React.FC = () => {
       ) ?? false)
     );
   });
+
+  const navigate = useNavigate();
+
+  // Function to handle row click
+  const handleRowClick = (url) => {
+    navigate(url);
+  };
+
+  
+  const getAge = (date) => {
+    const today = new Date();
+    return Math.floor(
+      (today.getTime() - new Date(date).getTime()) / 
+      (365.25 * 24 * 60 * 60 * 1000)
+    );
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -149,10 +191,10 @@ export const StudentList: React.FC = () => {
                     Student
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
+                    School
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    School
+                    Exams
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -164,20 +206,16 @@ export const StudentList: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50">
+                  <tr key={student.id} className="hover:bg-gray-50" onClick={() => handleRowClick(isStudent ? '#' :`/student/${student.id}`)}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {student.personalInfo.firstName} {student.personalInfo.lastName}
+                         {student.personalInfo.firstName} {student.personalInfo.lastName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {student.resume.firstNameKana} {student.resume.lastNameKana}
+                          {getAge(student.personalInfo.dateOfBirth)} years, {student.personalInfo.gender}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{student.personalInfo.phone}</div>
-                      <div className="text-sm text-gray-500">{student.personalInfo.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {classes[student.id]?.length > 0 ? (
@@ -187,7 +225,7 @@ export const StudentList: React.FC = () => {
                           </div>
                           {classes[student.id][classes[student.id].length - 1].school !== 'External' && (
                             <div className="text-sm text-gray-500">
-                              {classes[student.id][classes[student.id].length - 1].class_type} Class: {classes[student.id][classes[student.id].length - 1].class}
+                              {classes[student.id][classes[student.id].length - 1].class},{classes[student.id][classes[student.id].length - 1].batch}
                               {classes[student.id].length > 1 && (
                                 <span className="ml-1 text-xs text-gray-400">
                                   (+{classes[student.id].length - 1} more)
@@ -195,6 +233,23 @@ export const StudentList: React.FC = () => {
                               )}
                             </div>
                           )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">-</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {tests[student.id]?.length > 0 ? (
+                        <div>
+                          <div className="text-sm text-gray-900">
+                            {tests[student.id].map(test => (
+                              <div key={test.id}>
+                              {test.type === 'jft_basic_a2'
+                                ? 'JFT Basic A2'
+                                : test.skill_category}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ) : (
                         <div className="text-sm text-gray-500">-</div>
