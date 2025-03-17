@@ -557,7 +557,7 @@ export const StudentDetails: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2 text-gray-500">
                         <Calendar className="w-4 h-4" />
-                        {student.personalInfo.dateOfBirth}
+                        {new Date(student.personalInfo.dateOfBirth).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
@@ -897,37 +897,27 @@ export const StudentDetails: React.FC = () => {
                             No test results available
                           </div>
                         ) : (
-                          <div className="bg-white rounded-lg shadow overflow-hidden">
-                            <table className="min-w-full">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exams</th>
-                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passed Date</th>
-                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {tests.map(test => (
-                                  <tr key={test.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                      {getTestTypeLabel(test.type, test.skill_category)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {formatDate(test.passed_date)}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                      <button
-                                        onClick={() => handleEditTest(test)}
-                                        className="text-blue-500 hover:text-blue-600"
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          tests.map((test) => (
+                            <div key={test.id} className="bg-gray-50 rounded-lg p-4">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h3 className="text-lg font-medium text-gray-900">
+                                    {getTestTypeLabel(test.type, test.skill_category)}
+                                  </h3>
+                                  </div>
+                                <button
+                                  onClick={() => handleEditTest(test)}
+                                  className="text-blue-500 hover:text-blue-600"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Passed Date</p>
+                                <p className="font-medium">{formatDate(test.passed_date)}</p>
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
                     )}

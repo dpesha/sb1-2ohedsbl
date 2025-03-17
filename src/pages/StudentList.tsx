@@ -283,11 +283,16 @@ export const StudentList: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50" onClick={() => handleRowClick(isStudent ? '#' :`/student/${student.id}`)}>
+                  <tr key={student.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-lg font-medium">
+                        <Link
+                          to={isStudent ? '#' : `/student/${student.id}`}
+                          className="hover:text-blue-500"
+                        >
                          {student.personalInfo.firstName} {student.personalInfo.lastName}
+                         </Link>
                         </div>
                         <div className="text-sm text-gray-500">
                           {getAge(student.personalInfo.dateOfBirth)} years, {student.personalInfo.gender}
@@ -340,12 +345,6 @@ export const StudentList: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <Link
-                          to={`/student/${student.id}/cv`}
-                          className="text-gray-400 hover:text-blue-500"
-                        >
-                          <FileText className="w-5 h-5" />
-                        </Link>
-                        <Link
                           to={isStudent ? '#' : `/student/${student.id}`}
                           className="text-gray-400 hover:text-blue-500"
                         >
@@ -356,6 +355,12 @@ export const StudentList: React.FC = () => {
                           className="text-gray-400 hover:text-blue-500"
                         >
                           <Edit className="w-5 h-5" />
+                        </Link>
+                        <Link
+                          to={`/student/${student.id}/cv`}
+                          className="text-gray-400 hover:text-blue-500"
+                        >
+                          <FileText className="w-5 h-5" />
                         </Link>
                       </div>
                     </td>

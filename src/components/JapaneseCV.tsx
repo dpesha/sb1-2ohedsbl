@@ -204,9 +204,9 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             </tr>
             <tr>
               <th>来日可能日</th>
-              <td>{student.resume.possibleStartDate ? new Date(student.resume.possibleStartDate).toLocaleDateString('ja-JP') : 'いつでも可能'}</td>
+              <td>{student.resume.possibleStartDate ? new Date(student.resume.possibleStartDate).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' }) : 'いつでも可能'}</td>
               <th colSpan={2}>希望職種</th>
-              <td>{student.resume.jobCategory === 'nursing' ? '介護' : student.resume.jobCategory}</td>
+              <td>{student.resume.jobCategory}</td>
             </tr>
           </tbody>
         </table>
