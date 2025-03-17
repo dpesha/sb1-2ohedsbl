@@ -75,7 +75,7 @@ interface Class {
 export interface Test {
   id: string;
   student_id: string;
-  type: 'jft_basic_a2' | 'skill';
+  type: 'jft_basic_a2' |'kaigo_lang' |'skill';
   skill_category?: string;
   passed_date: string;
   created_at: string;

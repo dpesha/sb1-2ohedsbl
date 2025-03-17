@@ -39,6 +39,19 @@ const statusLabels = {
   dropped: 'Dropped'
 };
 
+const getTestTypeLabel = (type: string, skillCategory?: string): string => {
+  switch (type) {
+    case 'jft_basic_a2':
+      return 'JFT Basic A2';
+    case 'kaigo_lang':
+      return '介護日本語評価試験';
+    case 'skill':
+      return `${skillCategory || ''}技能評価試験`;
+    default:
+      return type;
+  }
+};
+
 export const StudentDetails: React.FC = () => {
   const { id } = useParams();
   const { students, loading, error, refreshStudents } = useStudents();
@@ -53,7 +66,8 @@ export const StudentDetails: React.FC = () => {
   const [editingTestId, setEditingTestId] = React.useState<string | null>(null);
   const [testForm, setTestForm] = React.useState<Partial<Test>>({
     type: 'jft_basic_a2',
-    passed_date: ''
+    passed_date: '',
+    skill_category: undefined
   });
   const [documents, setDocuments] = React.useState<StudentDocument[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -355,28 +369,22 @@ export const StudentDetails: React.FC = () => {
     if (!id || !testForm.type || !testForm.passed_date) return;
 
     try {
+      console.log('Submitting test form:', testForm); // Log the form data
+
       const testData = {
         student_id: id,
         type: testForm.type,
-        skill_category: testForm.type === 'skill' ? testForm.skill_category : null,
+        skill_category: testForm.type === 'skill' ? testForm.skill_category : undefined,
         passed_date: testForm.passed_date
       };
 
-      if (editingTestId) {
-        // Update existing test
-        const { error } = await supabase
-          .from('tests')
-          .update(testData)
-          .eq('id', editingTestId);
+      const { error } = await supabase
+        .from('tests')
+        .insert([testData]);
 
-        if (error) throw error;
-      } else {
-        // Insert new test
-        const { error } = await supabase
-          .from('tests')
-          .insert([testData]);
-
-        if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', error); // Log detailed error
+        throw error;
       }
 
       await fetchTests();
@@ -385,10 +393,12 @@ export const StudentDetails: React.FC = () => {
       setEditingTestId(null);
       setTestForm({
         type: 'jft_basic_a2',
-        passed_date: ''
+        passed_date: '',
+        skill_category: undefined
       });
     } catch (err) {
       console.error('Error adding test:', err);
+      alert('Error adding test. Please check the console for details.');
     }
   };
 
@@ -763,22 +773,23 @@ export const StudentDetails: React.FC = () => {
                               value={testForm.type}
                               onChange={(e) => setTestForm(prev => ({ 
                                 ...prev, 
-                                type: e.target.value as 'jft_basic_a2' | 'skill',
+                                type: e.target.value as 'jft_basic_a2' | 'kaigo_lang' | 'skill',
                                 skill_category: e.target.value === 'skill' ? '' : undefined
                               }))}
                               className="w-full px-3 py-2 border rounded-md"
                             >
                               <option value="jft_basic_a2">JFT BASIC A2</option>
-                              <option value="skill">Skill Test</option>
+                              <option value="kaigo_lang">介護日本語評価試験</option>
+                              <option value="skill">技能評価試験</option>
                             </select>
                           </div>
                           {testForm.type === 'skill' && (
-                            <div>
+                            <div className="mb-4">
                               <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Skill Category
                               </label>
                               <select
-                                value={testForm.skill_category}
+                                value={testForm.skill_category || ''}
                                 onChange={(e) => setTestForm(prev => ({ ...prev, skill_category: e.target.value }))}
                                 className="w-full px-3 py-2 border rounded-md"
                               >
@@ -812,7 +823,8 @@ export const StudentDetails: React.FC = () => {
                               setEditingTestId(null);
                               setTestForm({
                                 type: 'jft_basic_a2',
-                                passed_date: ''
+                                passed_date: '',
+                                skill_category: undefined
                               });
                             }}
                             className="px-4 py-2 text-gray-600 hover:text-gray-800"
@@ -834,32 +846,37 @@ export const StudentDetails: React.FC = () => {
                             No test results available
                           </div>
                         ) : (
-                          tests.map((test) => (
-                            <div key={test.id} className="bg-gray-50 rounded-lg p-4">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <h3 className="text-lg font-medium text-gray-900">
-                                    {test.type === 'jft_basic_a2' ? 'JFT BASIC A2' : 'Skill Test'}
-                                  </h3>
-                                  {test.type === 'skill' && (
-                                    <p className="text-sm text-gray-500">
-                                      {test.skill_category}
-                                    </p>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => handleEditTest(test)}
-                                  className="text-blue-500 hover:text-blue-600"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-500">Passed Date</p>
-                                <p className="font-medium">{test.passed_date}</p>
-                              </div>
-                            </div>
-                          ))
+                          <div className="bg-white rounded-lg shadow overflow-hidden">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exams</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passed Date</th>
+                                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {tests.map(test => (
+                                  <tr key={test.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                      {getTestTypeLabel(test.type, test.skill_category)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {new Date(test.passed_date).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                      <button
+                                        onClick={() => handleEditTest(test)}
+                                        className="text-blue-500 hover:text-blue-600"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </div>
                     )}

@@ -28,6 +28,19 @@ const statusLabels = {
   dropped: 'Dropped'
 };
 
+const getTestTypeLabel = (type: string, skillCategory?: string): string => {
+  switch (type) {
+    case 'jft_basic_a2':
+      return 'JFT Basic A2';
+    case 'kaigo_lang':
+      return '介護日本語';
+    case 'skill':
+      return `${skillCategory || ''}技能`;
+    default:
+      return type;
+  }
+};
+
 export const StudentList: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isStudent, setIsStudent] = React.useState(false);
@@ -299,9 +312,7 @@ export const StudentList: React.FC = () => {
                           <div className="text-sm text-gray-900">
                             {tests[student.id].map(test => (
                               <div key={test.id}>
-                              {test.type === 'jft_basic_a2'
-                                ? 'JFT Basic A2'
-                                : test.skill_category}
+                              {getTestTypeLabel(test.type, test.skill_category)}
                               </div>
                             ))}
                           </div>

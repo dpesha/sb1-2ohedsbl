@@ -42,6 +42,19 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
     (365.25 * 24 * 60 * 60 * 1000)
   );
 
+  const formatTestName = (test: TestRecord): string => {
+    switch (test.type) {
+      case 'jft_basic_a2':
+        return '国際交流基金日本語基礎テスト（JFT- Basic） A2 合格';
+      case 'kaigo_lang':
+        return '介護日本語評価試験 合格';
+      case 'skill':
+        return `${test.skill_category || ''}技能評価試験 合格`;
+      default:
+        return `${test.skill_category ? ` ${test.skill_category}` : ''}${test.type} 合格`;
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto bg-white shadow-lg animate-scale-in print:shadow-none">
       <div className="p-8 print:p-0 font-jp">
@@ -209,7 +222,7 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
           <tbody>
             {[...student.certificates, ...testRecords.map(test => ({
               date: test.passed_date,
-              name: `${test.type}${test.skill_category ? ` ${test.skill_category}` : ''} 合格`
+              name: formatTestName(test)
             }))].sort((a, b) => {
               const dateA = new Date(a.date);
               const dateB = new Date(b.date);
