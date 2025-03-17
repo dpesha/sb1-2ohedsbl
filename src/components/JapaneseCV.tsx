@@ -1,12 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { StudentRegistration } from '../types/student';
 import { formatJapaneseDate } from "../utils/dateUtils";
+import { supabase } from '../lib/supabase';
+
+interface TestRecord {
+  id: string;
+  passed_date: string;
+  type: string;
+  skill_category: string;
+}
 
 interface JapaneseCVProps {
   student: StudentRegistration & { id: string };
 }
 
 export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
+  const [testRecords, setTestRecords] = useState<TestRecord[]>([]);
+
+  useEffect(() => {
+    const fetchTestRecords = async () => {
+      const { data, error } = await supabase
+        .from('tests')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('passed_date', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching test records:', error);
+        return;
+      }
+
+      setTestRecords(data || []);
+    };
+
+    fetchTestRecords();
+  }, [student.id]);
+
   const today = new Date();
   const age = Math.floor(
     (today.getTime() - new Date(student.personalInfo.dateOfBirth).getTime()) / 
@@ -165,7 +194,7 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
         {/* Add page break before certificates section */}
         <div className="page-break-before"></div>
 
-        {/* Licenses & Qualifications Table */}
+        {/* Certificates and Tests Section */}
         <table className="cv-table mb-4">
           <thead>
              <tr>
@@ -178,14 +207,20 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             </tr>
           </thead>
           <tbody>
-            {student.certificates.map((cert, index) => (
+            {[...student.certificates, ...testRecords.map(test => ({
+              date: test.passed_date,
+              name: `${test.type}${test.skill_category ? ` ${test.skill_category}` : ''} 合格`
+            }))].sort((a, b) => {
+              const dateA = new Date(a.date);
+              const dateB = new Date(b.date);
+              return dateB.getTime() - dateA.getTime();
+            }).map((item, index) => (
               <tr key={`cert-${index}`}>
-                <td className="text-center">{cert.date.split('-')[0]}</td>
-                <td className="text-center">{cert.date.split('-')[1]}</td>
-                <td>{cert.name}</td>
+                <td className="text-center">{item.date.split('-')[0]}</td>
+                <td className="text-center">{item.date.split('-')[1]}</td>
+                <td>{item.name}</td>
               </tr>
             ))}
-           
           </tbody>
         </table>
 
