@@ -105,3 +105,28 @@ export interface ClassData {
   created_at: string;
   updated_at: string;
 }
+
+export interface StudentDocument {
+  id: string;
+  student_id: string;
+  type: 'Photos' | 'Resume' | 'Certificates' | 'その他' | 'Passport' | "Driver's License";
+  custom_type: string | null;
+  file_name: string;
+  file_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentDetails {
+  id: string;
+  document_id: string;
+  notes?: string;
+  document_number?: string;
+  date_of_issue?: string;
+  expiry_date?: string;
+  place_of_issue?: string;
+  license_type?: string;
+  license_category?: string;
+  created_at: string;
+  updated_at: string;
+}

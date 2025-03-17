@@ -6,6 +6,8 @@ export interface Job {
   category: string;
   position_count: number;
   preferred_gender: 'no preference' | 'male only' | 'female only';
+  min_age: number | null;
+  max_age: number | null;
   candidates_min_count: number;
   interview_date: string | null;
   status: 'open' | 'filled' | 'cancelled' | 'on_hold' | 'candidates_selected';

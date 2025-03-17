@@ -1,14 +1,13 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, Users, Briefcase, Award, GraduationCap, FileOutput, Plus, Trash2, ClipboardCheck, Upload, Download, Loader2, X, Eye } from 'lucide-react';
+import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, FileText, GraduationCap, FileOutput, Plus, Upload, Download, Loader2, X, Eye, ClipboardCheck, Trash2 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Logo } from '../components/Logo';
 import { useStudents } from '../contexts/StudentContext';
 
 // Set worker source for PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 import { FormField } from '../components/FormField';
-import type { StudentRegistration, ClassData, Test, StudentDocument } from '../types/student';
+import type { ClassData, Test, StudentDocument, DocumentDetails } from '../types/student';
 import { supabase } from '../lib/supabase';
 import { FullDateInput } from '../components/FullDateInput';
 import { DateInput } from '../components/DateInput';
@@ -45,11 +44,13 @@ export const StudentDetails: React.FC = () => {
   const { students, loading, error, refreshStudents } = useStudents();
   const [classes, setClasses] = React.useState<ClassData[]>([]);
   const [isEditingClass, setIsEditingClass] = React.useState(false);
+  const [editingClassId, setEditingClassId] = React.useState<string | null>(null);
   const [classForm, setClassForm] = React.useState<Partial<ClassData>>({});
   const student = students.find(s => s.id === id);
   const [activeTab, setActiveTab] = React.useState<'classes' | 'tests' | 'documents'>('classes');
   const [tests, setTests] = React.useState<Test[]>([]);
   const [isAddingTest, setIsAddingTest] = React.useState(false);
+  const [editingTestId, setEditingTestId] = React.useState<string | null>(null);
   const [testForm, setTestForm] = React.useState<Partial<Test>>({
     type: 'jft_basic_a2',
     passed_date: ''
@@ -116,8 +117,8 @@ export const StudentDetails: React.FC = () => {
 
     // Create preview URL for images
     if (file.type.startsWith('image/')) {
-      const previewUrl = URL.createObjectURL(file);
-      setPreviewUrl(previewUrl);
+      //const previewUrl = URL.createObjectURL(file);
+      //setPreviewUrl(previewUrl);
       setShowPreview(true);
     }
     
@@ -242,12 +243,7 @@ export const StudentDetails: React.FC = () => {
     }
   };
 
-  const handleEditDetails = (doc: StudentDocument) => {
-    setEditingDocumentId(doc.id);
-    setDocumentDetailsForm(documentDetails[doc.id] || {});
-  };
-
-  const handleDeleteDocument = async (document: StudentDocument) => {
+   const handleDeleteDocument = async (document: StudentDocument) => {
     try {
       // Delete file from Supabase Storage
       const { error: storageError } = await supabase.storage
@@ -267,6 +263,65 @@ export const StudentDetails: React.FC = () => {
       await fetchDocuments();
     } catch (err) {
       console.error('Error deleting document:', err);
+    }
+  };
+
+  const handleEditDetails = (doc: StudentDocument) => {
+    setEditingDocumentId(doc.id);
+    setDocumentDetailsForm(documentDetails[doc.id] || {});
+  };
+
+  const handleEditClass = (classData: ClassData) => {
+    setEditingClassId(classData.id);
+    setClassForm({
+      school: classData.school,
+      class: classData.class,
+      batch: classData.batch,
+      roll_number: classData.roll_number,
+      class_type: classData.class_type
+    });
+    setIsEditingClass(true);
+  };
+
+  const handleClassSubmit = async () => {
+    if (!id) return;
+
+    try {
+      const newClassData = {
+        ...classForm,
+        student_id: id
+      };
+
+      if (editingClassId) {
+        // Update existing class
+        const { error } = await supabase
+          .from('classes')
+          .update(newClassData)
+          .eq('id', editingClassId);
+
+        if (error) throw error;
+      } else {
+        // Insert new class
+        const { error } = await supabase
+          .from('classes')
+          .insert([newClassData]);
+
+        if (error) throw error;
+      }
+
+      await fetchClasses();
+      await refreshStudents();
+      setIsEditingClass(false);
+      setEditingClassId(null);
+      setClassForm({
+        school: '',
+        class: '',
+        batch: '',
+        roll_number: '',
+        class_type: 'Language'
+      });
+    } catch (err) {
+      console.error('Error saving class data:', err);
     }
   };
 
@@ -300,20 +355,34 @@ export const StudentDetails: React.FC = () => {
     if (!id || !testForm.type || !testForm.passed_date) return;
 
     try {
-      const { error } = await supabase
-        .from('tests')
-        .insert([{
-          student_id: id,
-          type: testForm.type,
-          skill_category: testForm.type === 'skill' ? testForm.skill_category : null,
-          passed_date: testForm.passed_date
-        }]);
+      const testData = {
+        student_id: id,
+        type: testForm.type,
+        skill_category: testForm.type === 'skill' ? testForm.skill_category : null,
+        passed_date: testForm.passed_date
+      };
 
-      if (error) throw error;
+      if (editingTestId) {
+        // Update existing test
+        const { error } = await supabase
+          .from('tests')
+          .update(testData)
+          .eq('id', editingTestId);
+
+        if (error) throw error;
+      } else {
+        // Insert new test
+        const { error } = await supabase
+          .from('tests')
+          .insert([testData]);
+
+        if (error) throw error;
+      }
 
       await fetchTests();
       await refreshStudents();
       setIsAddingTest(false);
+      setEditingTestId(null);
       setTestForm({
         type: 'jft_basic_a2',
         passed_date: ''
@@ -323,18 +392,14 @@ export const StudentDetails: React.FC = () => {
     }
   };
 
-  const handleDeleteTest = async (testId: string) => {
-    try {
-      const { error } = await supabase
-        .from('tests')
-        .delete()
-        .eq('id', testId);
-
-      if (error) throw error;
-      await fetchTests();
-    } catch (err) {
-      console.error('Error deleting test:', err);
-    }
+  const handleEditTest = (test: Test) => {
+    setEditingTestId(test.id);
+    setTestForm({
+      type: test.type,
+      skill_category: test.skill_category,
+      passed_date: test.passed_date
+    });
+    setIsAddingTest(true);
   };
 
   const fetchClasses = async () => {
@@ -355,51 +420,6 @@ export const StudentDetails: React.FC = () => {
       });
     } catch (err) {
       console.error('Error fetching classes:', err);
-    }
-  };
-
-  const handleDeleteClass = async (classId: string) => {
-    try {
-      const { error } = await supabase
-        .from('classes')
-        .delete()
-        .eq('id', classId);
-
-      if (error) throw error;
-      await fetchClasses();
-      await refreshStudents();
-    } catch (err) {
-      console.error('Error deleting class:', err);
-    }
-  };
-
-  const handleClassSubmit = async () => {
-    if (!id) return;
-
-    try {
-      const newClassData = {
-        ...classForm,
-        student_id: id
-      };
-
-      const { error } = await supabase
-        .from('classes')
-        .insert([newClassData]);
-
-      if (error) throw error;
-
-      await fetchClasses();
-      await refreshStudents();
-      setIsEditingClass(false);
-      setClassForm({
-        school: '',
-        class: '',
-        batch: '',
-        roll_number: '',
-        class_type: 'Language'
-      });
-    } catch (err) {
-      console.error('Error saving class data:', err);
     }
   };
 
@@ -555,7 +575,7 @@ export const StudentDetails: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <ClipboardCheck className="w-5 h-5" />
+                          <ClipboardCheck className="w-5 h-5" />  
                           Tests
                         </div>
                       </button>
@@ -652,7 +672,7 @@ export const StudentDetails: React.FC = () => {
                           type="text"
                           disabled={classForm.school === 'External'}
                           value={classForm.batch || ''}
-                          onChange={(e) => setClassForm(prev => ({ ...prev, section: e.target.value }))}
+                          onChange={(e) => setClassForm(prev => ({ ...prev, batch: e.target.value }))}
                           className="w-full px-3 py-2 border rounded-md"
                         />
                       </div>
@@ -681,7 +701,7 @@ export const StudentDetails: React.FC = () => {
                         onClick={handleClassSubmit}
                         className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                       >
-                        Enroll into Class
+                        {editingClassId ? 'Update Class' : 'Enroll into Class'}
                       </button>
                       </div>
                     </div>
@@ -704,10 +724,10 @@ export const StudentDetails: React.FC = () => {
                             </p>
                           </div>
                           <button
-                            onClick={() => handleDeleteClass(classData.id)}
-                            className="text-red-500 hover:text-red-600"
+                            onClick={() => handleEditClass(classData)}
+                            className="text-blue-500 hover:text-blue-600"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Edit className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -787,7 +807,14 @@ export const StudentDetails: React.FC = () => {
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setIsAddingTest(false)}
+                            onClick={() => {
+                              setIsAddingTest(false);
+                              setEditingTestId(null);
+                              setTestForm({
+                                type: 'jft_basic_a2',
+                                passed_date: ''
+                              });
+                            }}
                             className="px-4 py-2 text-gray-600 hover:text-gray-800"
                           >
                             Cancel
@@ -796,44 +823,44 @@ export const StudentDetails: React.FC = () => {
                             onClick={handleAddTest}
                             className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                           >
-                            Add Test Result
+                            {editingTestId ? 'Update Test' : 'Add Test Result'}
                           </button>
                         </div>
                       </div>
-                    ) : tests.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No test results available
-                      </div>
                     ) : (
                       <div className="space-y-4">
-                        {tests.map((test) => (
-                          <div key={test.id} className="bg-gray-50 rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-4">
-                              <div>
-                                <h3 className="text-lg font-medium text-gray-900">
-                                  {test.type === 'jft_basic_a2' ? 'JFT BASIC A2' : 'Skill Test'}
-                                </h3>
-                                {test.type === 'skill' && (
-                                  <p className="text-sm text-gray-500">
-                                    {test.skill_category}
-                                  </p>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleDeleteTest(test.id)}
-                                className="text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Passed Date</p>
-                              <p className="font-medium">
-                                {test.passed_date.split('-')[0]}/{test.passed_date.split('-')[1]}
-                              </p>
-                            </div>
+                        {tests.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            No test results available
                           </div>
-                        ))}
+                        ) : (
+                          tests.map((test) => (
+                            <div key={test.id} className="bg-gray-50 rounded-lg p-4">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h3 className="text-lg font-medium text-gray-900">
+                                    {test.type === 'jft_basic_a2' ? 'JFT BASIC A2' : 'Skill Test'}
+                                  </h3>
+                                  {test.type === 'skill' && (
+                                    <p className="text-sm text-gray-500">
+                                      {test.skill_category}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleEditTest(test)}
+                                  className="text-blue-500 hover:text-blue-600"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Passed Date</p>
+                                <p className="font-medium">{test.passed_date}</p>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     )}
                   </>
@@ -956,20 +983,20 @@ export const StudentDetails: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleDownload(doc)}
-                                  className="text-blue-500 hover:text-blue-600"
+                                  className="text-gray-400 hover:text-blue-500"
                                   disabled={downloadingFiles[doc.id]}
                                 >
                                   {downloadingFiles[doc.id] ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-5 h-5" />
                                   )}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteDocument(doc)}
-                                  className="text-red-500 hover:text-red-600"
+                                  className="text-gray-400 hover:text-red-500"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-5 h-5" />
                                 </button>
                               </div>
                             </div>

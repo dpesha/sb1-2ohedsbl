@@ -20,6 +20,8 @@ export const JobForm: React.FC = () => {
     candidates_min_count: 1,
     interview_date: null,
     preferred_gender: 'no preference',
+    min_age: null,
+    max_age: null,
     status: 'open'
   });
 
@@ -113,7 +115,9 @@ export const JobForm: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'position_count' ? parseInt(value) || 1 : value
+      [name]: name === 'position_count' || name === 'min_age' || name === 'max_age' 
+        ? value === '' ? null : parseInt(value) || null
+        : value
     }));
   };
 
@@ -245,6 +249,47 @@ export const JobForm: React.FC = () => {
                 <option value="male only">Male Only</option>
                 <option value="female only">Female Only</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Age Requirement
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Minimum Age
+                  </label>
+                  <input
+                    type="number"
+                    name="min_age"
+                    value={formData.min_age || ''}
+                    onChange={handleChange}
+                    min="18"
+                    max="65"
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="e.g., 20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Maximum Age
+                  </label>
+                  <input
+                    type="number"
+                    name="max_age"
+                    value={formData.max_age || ''}
+                    onChange={handleChange}
+                    min="18"
+                    max="65"
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="e.g., 25"
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Leave both fields empty if there is no age requirement
+              </p>
             </div>
 
             <div>

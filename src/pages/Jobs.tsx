@@ -161,7 +161,7 @@ export const Jobs: React.FC = () => {
                       Client
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
+                      Details
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Category
@@ -219,6 +219,15 @@ export const Jobs: React.FC = () => {
                             {job.preferred_gender !== 'no preference' && (
                               <span className="text-gray-500 ml-2 capitalize">
                                 • {job.preferred_gender}
+                              </span>
+                            )}
+                            {(job.min_age || job.max_age) && (
+                              <span className="text-gray-500 ml-2">
+                                • {job.min_age && job.max_age
+                                    ? `${job.min_age}~${job.max_age}y`
+                                    : job.min_age
+                                    ? `>${job.min_age}y`
+                                    : `<${job.max_age}y`}
                               </span>
                             )}
                           </span>

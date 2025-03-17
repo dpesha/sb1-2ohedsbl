@@ -1,12 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, Video, UserCheck, FileText, Upload, X, Download, Loader2, Eye } from 'lucide-react';
+import { Briefcase, ArrowLeft, Edit, Building2, MapPin, Users, Calendar, UserCheck, FileText, Upload, Trash2, Download, Loader2, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Job } from '../types/job';
 import type { Client } from '../types/client';
-import type { JobCandidate, EligibleStudent } from '../types/jobCandidate';
+import type { JobCandidate } from '../types/jobCandidate';
 import type { JobDocument } from '../types/jobDocument';
 import { DocumentPreview } from '../components/DocumentPreview';
+
+interface Student {
+  id: string;
+  personal_info: {
+    firstName: string;
+    lastName: string;
+    gender: 'male' | 'female' | 'other';
+    dateOfBirth: string;
+  };
+  resume: {
+    firstNameKana: string;
+    lastNameKana: string;
+    jobCategory: string;
+  };
+}
+
+interface JobCandidateWithStudent extends JobCandidate {
+  student: Student;
+}
 
 const statusColors = {
   open: 'bg-green-100 text-green-800',
@@ -31,10 +50,10 @@ const JobDetails: React.FC = () => {
   const [job, setJob] = useState<(Job & { client: Client }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [eligibleStudents, setEligibleStudents] = useState<EligibleStudent[]>([]);
+  const [eligibleStudents, setEligibleStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const [activeTab, setActiveTab] = useState<'candidates' | 'results'>('candidates');
-  const [candidates, setCandidates] = useState<(JobCandidate & { student: EligibleStudent })[]>([]);
+  const [activeTab, setActiveTab] = useState<'candidates' | 'results' | 'documents'>('candidates');
+  const [candidates, setCandidates] = useState<JobCandidateWithStudent[]>([]);
   const [documents, setDocuments] = useState<JobDocument[]>([]);
   const [resultDates, setResultDates] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
@@ -43,14 +62,45 @@ const JobDetails: React.FC = () => {
   const [customType, setCustomType] = useState('');
   const [selectedDocument, setSelectedDocument] = useState<JobDocument | null>(null);
 
+  const calculateAge = (dateOfBirth: string): number => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const isEligibleStudent = (student: Student, job: Job): boolean => {
+    // Gender check
+    if (job.preferred_gender !== 'no preference' && 
+        student.personal_info.gender !== job.preferred_gender.replace(' only', '')) {
+      return false;
+    }
+    
+    // Age check
+    if (job.min_age || job.max_age) {
+      const age = calculateAge(student.personal_info.dateOfBirth);
+      if (job.min_age && age < job.min_age) return false;
+      if (job.max_age && age > job.max_age) return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     fetchJob();
-    if (id) {
+  }, [id]);
+
+  useEffect(() => {
+    if (id && job) {
       fetchEligibleStudents();
       fetchCandidates();
       fetchDocuments();
     }
-  }, [id]);
+  }, [id, job]);
 
   const fetchDocuments = async () => {
     try {
@@ -161,7 +211,8 @@ const JobDetails: React.FC = () => {
             resume
           )
         `)
-        .eq('job_id', id);
+        .eq('job_id', id)
+        .order('created_at', { ascending: true }); // Add stable ordering by creation time
 
       if (error) throw error;
       setCandidates(data || []);
@@ -189,19 +240,33 @@ const JobDetails: React.FC = () => {
         .from('job_candidates')
         .update({ 
           status,
-          result_date: resultDates[candidateId]
+          result_date: resultDates[candidateId] || new Date().toISOString().split('T')[0]
         })
         .eq('id', candidateId);
 
       if (error) throw error;
-      await fetchCandidates();
+
+      // Update the status locally to maintain order
+      setCandidates(prev => prev.map(candidate => 
+        candidate.id === candidateId 
+          ? { ...candidate, status } 
+          : candidate
+      ));
+
+      // Update result date locally if not already set
+      if (!resultDates[candidateId]) {
+        setResultDates(prev => ({
+          ...prev,
+          [candidateId]: new Date().toISOString().split('T')[0]
+        }));
+      }
     } catch (err) {
       console.error('Error updating candidate status:', err);
     }
   };
 
   const fetchEligibleStudents = async () => {
-    if (!id) return;
+    if (!id || !job) return;
     
     try {
       setLoadingStudents(true);
@@ -209,7 +274,10 @@ const JobDetails: React.FC = () => {
         .rpc('get_eligible_students', { p_job_id: id });
 
       if (error) throw error;
-      setEligibleStudents(data || []);
+      
+      // Filter students based on gender and age requirements
+      const filteredStudents = (data || []).filter((student: Student) => isEligibleStudent(student, job));
+      setEligibleStudents(filteredStudents);
     } catch (err) {
       console.error('Error fetching eligible students:', err);
     } finally {
@@ -217,7 +285,7 @@ const JobDetails: React.FC = () => {
     }
   };
 
-  const handleSelectStudent = async (student: EligibleStudent) => {
+  const handleSelectStudent = async (student: Student) => {
     try {
       const { error } = await supabase
         .from('job_candidates')
@@ -256,15 +324,13 @@ const JobDetails: React.FC = () => {
   };
 
   const fetchJob = async () => {
+    if (!id) return;
+    
     try {
-      if (!id) return;
-
+      setLoading(true);
       const { data, error } = await supabase
         .from('jobs')
-        .select(`
-          *,
-          client:client_id (*)
-        `)
+        .select('*, client:clients(*)')
         .eq('id', id)
         .single();
 
@@ -277,6 +343,62 @@ const JobDetails: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Set up real-time subscription for job updates
+  useEffect(() => {
+    if (!id) return;
+
+    const jobSubscription = supabase
+      .channel('job-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Job updated:', payload);
+          fetchJob(); // Refetch the job when it's updated
+        }
+      )
+      .subscribe();
+
+    // Set up subscription for student data changes
+    const studentSubscription = supabase
+      .channel('student-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all changes (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'student_registrations'
+        },
+        () => {
+          console.log('Student data changed, refreshing eligible students');
+          fetchEligibleStudents();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for all changes
+          schema: 'public',
+          table: 'personal_info'
+        },
+        () => {
+          console.log('Student personal info changed, refreshing eligible students');
+          fetchEligibleStudents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      jobSubscription.unsubscribe();
+      studentSubscription.unsubscribe();
+    };
+  }, [id]);
 
   if (loading) {
     return (
@@ -362,6 +484,18 @@ const JobDetails: React.FC = () => {
                       <span className="text-gray-600 capitalize">{job.preferred_gender}</span>
                     </>
                   )}
+                  {(job.min_age || job.max_age) && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-gray-600">
+                        {job.min_age && job.max_age
+                          ? `${job.min_age} ~ ${job.max_age} years old`
+                          : job.min_age
+                          ? `Above ${job.min_age} years old`
+                          : `Below ${job.max_age} years old`}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -403,8 +537,6 @@ const JobDetails: React.FC = () => {
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-gray-600">
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="w-5 h-5 text-gray-400" />
                     <span>Last Updated: {new Date(job.updated_at).toLocaleDateString()}</span>
                   </div>
@@ -415,50 +547,48 @@ const JobDetails: React.FC = () => {
 
           {/* Candidates Section */}
           <div className="p-6 border-t">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex border-b">
-                  <button
-                    onClick={() => setActiveTab('candidates')}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                      activeTab === 'candidates'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Candidates
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('results')}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                      activeTab === 'results'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="w-5 h-5" />
-                      Interview Results
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('documents')}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 -mb-px ${
-                      activeTab === 'documents'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Documents
-                    </div>
-                  </button>
-                </div>
-              </div>
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('candidates')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'candidates'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Candidates
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('results')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'results'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-5 h-5" />
+                    Interview Results
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('documents')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'documents'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Documents
+                  </div>
+                </button>
+              </nav>
             </div>
 
             {activeTab === 'candidates' && <div className="grid grid-cols-2 gap-6">
@@ -487,10 +617,7 @@ const JobDetails: React.FC = () => {
                             {student.personal_info.firstName} {student.personal_info.lastName}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {student.resume.firstNameKana} {student.resume.lastNameKana}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {student.resume.jobCategory}
+                          {calculateAge(student.personal_info.dateOfBirth)} years, {student.personal_info.gender}
                           </div>
                         </div>
                         <button
@@ -527,7 +654,7 @@ const JobDetails: React.FC = () => {
                               {candidate.student.personal_info.firstName} {candidate.student.personal_info.lastName}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {candidate.student.resume.firstNameKana} {candidate.student.resume.lastNameKana}
+                              {calculateAge(candidate.student.personal_info.dateOfBirth)} years, {candidate.student.personal_info.gender}
                             </div>
                           </div>
                           <button
@@ -578,7 +705,7 @@ const JobDetails: React.FC = () => {
                                   {candidate.student.personal_info.firstName} {candidate.student.personal_info.lastName}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {candidate.student.resume.firstNameKana} {candidate.student.resume.lastNameKana}
+                                {calculateAge(candidate.student.personal_info.dateOfBirth)} years, {candidate.student.personal_info.gender}
                                 </div>
                               </div>
                             </td>
@@ -696,17 +823,17 @@ const JobDetails: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setSelectedDocument(doc)}
-                            className="p-2 text-gray-400 hover:text-blue-500"
+                            className="text-gray-400 hover:text-blue-500"
                             title="Preview Document"
                           >
                             <Eye className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => handleDeleteDocument(doc)}
-                            className="p-2 text-gray-400 hover:text-red-500"
+                            className="text-gray-400 hover:text-red-500"
                             title="Delete Document"
                           >
-                            <X className="w-5 h-5" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
