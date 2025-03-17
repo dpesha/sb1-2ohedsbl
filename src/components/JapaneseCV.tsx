@@ -49,10 +49,61 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
       case 'kaigo_lang':
         return '介護日本語評価試験 合格';
       case 'skill':
-        return `${test.skill_category || ''}技能評価試験 合格`;
+        return `${test.skill_category || ''}技能評価試験 (NEPALESE) 合格`;
       default:
         return `${test.skill_category ? ` ${test.skill_category}` : ''}${test.type} 合格`;
     }
+  };
+
+  /**
+   * Gets the display year and month from endDate or startDate
+   * Priority order:
+   * 1. endDate with valid year and non-00 month
+   * 2. endDate with valid year and 00 month
+   * 3. startDate if endDate has empty year and 00 month
+   * 4. startDate if endDate is invalid/empty
+   */
+  const getDisplayDate = (endDate?: string, startDate?: string) => {
+    // Case 1: Use endDate if it has valid year and non-00 month
+    if (endDate) {
+      const [year, month] = endDate.split('-');
+      if (year && month !== '00') {
+        return { year, month };
+      }
+    }
+
+    // Case 2 & 3: Handle endDate with 00 month
+    if (endDate) {
+      const [year, month] = endDate.split('-');
+      if (year && month === '00') {
+        // Case 3: Empty year with 00 month - fallback to startDate
+        if (!year.trim()) {
+          const [startYear, startMonth] = (startDate || '').split('-');
+          return { 
+            year: startYear || '', 
+            month: startMonth === '00' ? '' : startMonth || '' 
+          };
+        }
+        // Case 2: Valid year with 00 month
+        return { year, month: '' };
+      }
+    }
+
+    // Case 4: Fallback to startDate for all other cases
+    const [year, month] = (startDate || '').split('-');
+    return { 
+      year: year || '', 
+      month: month === '00' ? '' : month || '' 
+    };
+  };
+
+  const formatBirthDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate()
+    };
   };
 
   return (
@@ -90,18 +141,21 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
               <td colSpan={3} className="text-xl font-semibold">{student.personalInfo.lastName} {student.personalInfo.firstName}</td>
             </tr>
             <tr>
-              <th>
-                <div className="flex justify-between">
-                  <span>生年月日</span>
-                </div>
+              <th className="w-1/6">
+                生年月日
               </th>
               <td className="w-1/2 text-center text-sm">
-                <span>{new Date(student.personalInfo.dateOfBirth).getFullYear()}年</span>
-              　<span>{new Date(student.personalInfo.dateOfBirth).getMonth() + 1}月</span>
-                <span>{new Date(student.personalInfo.dateOfBirth).getDate()}日</span>
-                  <span>（満</span>
-                  <span>{age}</span>
-                  <span>歳）</span>
+                {(() => {
+                  const birth = formatBirthDate(student.personalInfo.dateOfBirth);
+                  return (
+                    <>
+                      <span>{birth.year}年</span>
+                      <span>{birth.month}月</span>
+                      <span>{birth.day}日</span>
+                      <span className="ml-2">（満{age}歳）</span>
+                    </>
+                  );
+                })()}
               </td>
               <th className="w-1/6">性別</th>
               <td> {student.personalInfo.gender === 'male' ? '男' : student.personalInfo.gender === 'female' ? '女' : 'その他'}</td>
@@ -170,13 +224,16 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             </tr>
           </thead>
           <tbody>
-            {student.education.map((edu, index) => (
-              <tr key={`edu-${index}`}>
-                <td className="text-center">{edu.startDate.split('-')[0]}</td>
-                <td className="text-center">{edu.startDate.split('-')[1]}</td>
-                <td>{edu.institution}</td>
-              </tr>
-            ))}
+            {student.education.map((edu, index) => {
+              const date = getDisplayDate(edu.endDate, edu.startDate);
+              return (
+                <tr key={`edu-${index}`}>
+                  <td className="text-center">{date.year}</td>
+                  <td className="text-center">{date.month}</td>
+                  <td>{edu.institution}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -193,13 +250,16 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
             </tr>
           </thead>
           <tbody>
-            {student.workExperience.map((work, index) => (
-              <tr key={`work-${index}`}>
-                <td className="text-center">{work.startDate.split('-')[0]}</td>
-                <td className="text-center">{work.startDate.split('-')[1]}</td>
-                <td>{work.company}({work.position})</td>
-              </tr>
-            ))}
+            {student.workExperience.map((work, index) => {
+              const date = getDisplayDate(work.endDate, work.startDate);
+              return (
+                <tr key={`work-${index}`}>
+                  <td className="text-center">{date.year}</td>
+                  <td className="text-center">{date.month}</td>
+                  <td>{work.company}({work.position})</td>
+                </tr>
+              );
+            })}
            
           </tbody>
         </table>
@@ -221,19 +281,22 @@ export const JapaneseCV: React.FC<JapaneseCVProps> = ({ student }) => {
           </thead>
           <tbody>
             {[...student.certificates, ...testRecords.map(test => ({
-              date: test.passed_date,
+              date: test.passed_date || '',
               name: formatTestName(test)
             }))].sort((a, b) => {
-              const dateA = new Date(a.date);
-              const dateB = new Date(b.date);
+              const dateA = a.date ? new Date(a.date) : new Date(0);
+              const dateB = b.date ? new Date(b.date) : new Date(0);
               return dateB.getTime() - dateA.getTime();
-            }).map((item, index) => (
-              <tr key={`cert-${index}`}>
-                <td className="text-center">{item.date.split('-')[0]}</td>
-                <td className="text-center">{item.date.split('-')[1]}</td>
-                <td>{item.name}</td>
-              </tr>
-            ))}
+            }).map((item, index) => {
+              const date = getDisplayDate(item.date);
+              return (
+                <tr key={`cert-${index}`}>
+                  <td className="text-center">{date.year}</td>
+                  <td className="text-center">{date.month}</td>
+                  <td>{item.name}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

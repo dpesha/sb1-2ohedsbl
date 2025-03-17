@@ -41,6 +41,15 @@ const getTestTypeLabel = (type: string, skillCategory?: string): string => {
   }
 };
 
+const formatDate = (date: string) => {
+  if (!date) return '';
+  const [year, month] = date.split('-');
+  if (month === '00') {
+    return `${year}年`;
+  }
+  return new Date(date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric' });
+};
+
 export const StudentList: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isStudent, setIsStudent] = React.useState(false);
@@ -311,8 +320,8 @@ export const StudentList: React.FC = () => {
                         <div>
                           <div className="text-sm text-gray-900">
                             {tests[student.id].map(test => (
-                              <div key={test.id}>
-                              {getTestTypeLabel(test.type, test.skill_category)}
+                              <div key={test.id} className="flex justify-between">
+                                <span>{getTestTypeLabel(test.type, test.skill_category)}</span>
                               </div>
                             ))}
                           </div>

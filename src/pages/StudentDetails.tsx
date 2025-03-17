@@ -10,7 +10,6 @@ import { FormField } from '../components/FormField';
 import type { ClassData, Test, StudentDocument, DocumentDetails } from '../types/student';
 import { supabase } from '../lib/supabase';
 import { FullDateInput } from '../components/FullDateInput';
-import { DateInput } from '../components/DateInput';
 
 const SCHOOLS = [
   'Kings - Kathmandu',
@@ -52,6 +51,15 @@ const getTestTypeLabel = (type: string, skillCategory?: string): string => {
   }
 };
 
+const formatDate = (date: string) => {
+  if (!date) return '';
+  const [year, month] = date.split('-');
+  if (month === '00') {
+    return `${year}年`;
+  }
+  return new Date(date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric' });
+};
+
 export const StudentDetails: React.FC = () => {
   const { id } = useParams();
   const { students, loading, error, refreshStudents } = useStudents();
@@ -66,8 +74,8 @@ export const StudentDetails: React.FC = () => {
   const [editingTestId, setEditingTestId] = React.useState<string | null>(null);
   const [testForm, setTestForm] = React.useState<Partial<Test>>({
     type: 'jft_basic_a2',
-    passed_date: '',
-    skill_category: undefined
+    skill_category: undefined,
+    passed_date: `${new Date().getFullYear()}-00`
   });
   const [documents, setDocuments] = React.useState<StudentDocument[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -393,8 +401,8 @@ export const StudentDetails: React.FC = () => {
       setEditingTestId(null);
       setTestForm({
         type: 'jft_basic_a2',
-        passed_date: '',
-        skill_category: undefined
+        skill_category: undefined,
+        passed_date: `${new Date().getFullYear()}-00`
       });
     } catch (err) {
       console.error('Error adding test:', err);
@@ -809,11 +817,54 @@ export const StudentDetails: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Passed Date
                             </label>
-                            <DateInput
-                              value={testForm.passed_date || ''}
-                              onChange={(value) => setTestForm(prev => ({ ...prev, passed_date: value }))}
-                              className="w-full"
-                            />
+                            <div className="flex gap-4">
+                              <select
+                                value={testForm.passed_date?.split('-')[0] || ''}
+                                onChange={(e) => {
+                                  const year = e.target.value;
+                                  const currentDate = testForm.passed_date?.split('-') || [];
+                                  const month = currentDate[1] || '00';
+                                  setTestForm(prev => ({
+                                    ...prev,
+                                    passed_date: `${year}-${month}`
+                                  }));
+                                }}
+                                className="w-32 px-3 py-2 border rounded-md"
+                              >
+                                <option value="">Select Year</option>
+                                {Array.from({ length: 10 }, (_, i) => {
+                                  const year = new Date().getFullYear() - i;
+                                  return (
+                                    <option key={year} value={year}>
+                                      {year}年
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <select
+                                value={testForm.passed_date?.split('-')[1] || '00'}
+                                onChange={(e) => {
+                                  const month = e.target.value;
+                                  const currentDate = testForm.passed_date?.split('-') || [];
+                                  const year = currentDate[0] || new Date().getFullYear().toString();
+                                  setTestForm(prev => ({
+                                    ...prev,
+                                    passed_date: `${year}-${month}`
+                                  }));
+                                }}
+                                className="w-32 px-3 py-2 border rounded-md"
+                              >
+                                <option value="00">年のみ</option>
+                                {Array.from({ length: 12 }, (_, i) => {
+                                  const month = (i + 1).toString().padStart(2, '0');
+                                  return (
+                                    <option key={month} value={month}>
+                                      {month}月
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -823,8 +874,8 @@ export const StudentDetails: React.FC = () => {
                               setEditingTestId(null);
                               setTestForm({
                                 type: 'jft_basic_a2',
-                                passed_date: '',
-                                skill_category: undefined
+                                skill_category: undefined,
+                                passed_date: `${new Date().getFullYear()}-00`
                               });
                             }}
                             className="px-4 py-2 text-gray-600 hover:text-gray-800"
@@ -862,7 +913,7 @@ export const StudentDetails: React.FC = () => {
                                       {getTestTypeLabel(test.type, test.skill_category)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {new Date(test.passed_date).toLocaleDateString()}
+                                      {formatDate(test.passed_date)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                       <button
