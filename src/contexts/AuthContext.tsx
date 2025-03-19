@@ -55,10 +55,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
-      const { error, data } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { error: signInError, data } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+
       if (data.session) {
-        await refreshStudents();
+        try {
+          await refreshStudents();
+        } catch (refreshError) {
+          console.error('Error refreshing students:', refreshError);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
@@ -80,11 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setError(null);
-      // Clear local state first
-      setUser(null);
-      
-      // Then attempt to sign out from Supabase
+      // Sign out from Supabase first
       await supabase.auth.signOut();
+      
+      // Then clear local state
+      setUser(null);
       
       // Always navigate to auth page
       navigate('/auth');

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { StudentRegistration } from '../types/student'
+import { useAuth } from './AuthContext';
 
 type StudentContextType = {
   students: (StudentRegistration & { id: string })[];
@@ -22,11 +23,17 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [students, setStudents] = useState<(StudentRegistration & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      if (!user) {
+        setStudents([]);
+        return;
+      }
 
       const { data, error: fetchError } = await supabase
         .from('students')
@@ -67,7 +74,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [user?.id, user]); // Re-fetch when user changes
 
   useEffect(() => {
     const subscription = supabase
